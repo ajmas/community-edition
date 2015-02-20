@@ -22,21 +22,18 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.alfresco.error.AlfrescoRuntimeException;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.HeadMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpResponse;
+import org.apache.http.ProtocolException;
+import org.apache.http.client.methods.*;
+import org.apache.http.client.*;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.ContentType;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.LaxRedirectStrategy;
+import org.apache.http.params.CoreProtocolPNames;
 
 public abstract class AbstractHttpClient implements AlfrescoHttpClient
 {
@@ -54,6 +51,12 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
     public AbstractHttpClient(HttpClient httpClient)
     {
         this.httpClient = httpClient;
+    }
+    
+    public AbstractHttpClient(HttpClientBuilder httpClientBuilder)
+    {
+    	httpClientBuilder.setRedirectStrategy(new LaxRedirectStrategy());
+        this.httpClient = httpClientBuilder.build();
     }
     
     protected HttpClient getHttpClient()
@@ -76,28 +79,11 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
     {
         this.baseUrl = baseUrl;
     }
-
-    private boolean isRedirect(HttpMethod method)
-    {
-        switch (method.getStatusCode()) {
-        case HttpStatus.SC_MOVED_TEMPORARILY:
-        case HttpStatus.SC_MOVED_PERMANENTLY:
-        case HttpStatus.SC_SEE_OTHER:
-        case HttpStatus.SC_TEMPORARY_REDIRECT:
-            if (method.getFollowRedirects()) {
-                return true;
-            } else {
-                return false;
-            }
-        default:
-            return false;
-        }
-    }
     
     /**
      * Send Request to the repository
      */
-    protected HttpMethod sendRemoteRequest(Request req) throws AuthenticationException, IOException
+    protected HttpResponse sendRemoteRequest(Request req) throws AuthenticationException, ProtocolException, IOException
     {
         if (logger.isDebugEnabled())
         {
@@ -105,39 +91,22 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
             logger.debug("* Request: " + req.getMethod() + " " + req.getFullUri() + (req.getBody() == null ? "" : "\n" + new String(req.getBody(), "UTF-8")));
         }
 
-        HttpMethod method = createMethod(req);
+        HttpUriRequest method = createMethod(req);
 
         // execute method
-        executeMethod(method);
-
-        // Deal with redirect
-        if(isRedirect(method))
-        {
-            Header locationHeader = method.getResponseHeader("location");
-            if (locationHeader != null)
-            {
-                String redirectLocation = locationHeader.getValue();
-                method.setURI(new URI(redirectLocation, true));
-                httpClient.executeMethod(method);
-            }
-        }
-
-        return method;
+        return executeMethod(method);
     }
     
-    protected long executeMethod(HttpMethod method) throws HttpException, IOException
+    protected HttpResponse executeMethod(HttpUriRequest method) throws ProtocolException, IOException
     {
         // execute method
 
-        long startTime = System.currentTimeMillis();
-
         // TODO: Pool, and sent host configuration and state on execution
-        getHttpClient().executeMethod(method);
+        return getHttpClient().execute(method);
 
-        return System.currentTimeMillis() - startTime;
     }
 
-    protected HttpMethod createMethod(Request req) throws IOException
+    protected HttpUriRequest createMethod(Request req) throws IOException
     {
         StringBuilder url = new StringBuilder(128);
         url.append(baseUrl);
@@ -145,31 +114,29 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
         url.append(req.getFullUri());
 
         // construct method
-        HttpMethod httpMethod = null;
+        HttpUriRequest httpMethod = null;
         String method = req.getMethod();
         if(method.equalsIgnoreCase("GET"))
         {
-            GetMethod get = new GetMethod(url.toString());
+            HttpGet get = new HttpGet(url.toString());
             httpMethod = get;
-            httpMethod.setFollowRedirects(true);
         }
         else if(method.equalsIgnoreCase("POST"))
         {
-            PostMethod post = new PostMethod(url.toString());
+            HttpPost post = new HttpPost(url.toString());
             httpMethod = post;
-            ByteArrayRequestEntity requestEntity = new ByteArrayRequestEntity(req.getBody(), req.getType());
+            ByteArrayEntity httpEntity = new ByteArrayEntity(req.getBody(), ContentType.create(req.getType()));
             if (req.getBody().length > DEFAULT_SAVEPOST_BUFFER)
             {
-                post.getParams().setBooleanParameter(HttpMethodParams.USE_EXPECT_CONTINUE, true);
+                post.getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, true);
             }
-            post.setRequestEntity(requestEntity);
+            post.setEntity(httpEntity);
             // Note: not able to automatically follow redirects for POST, this is handled by sendRemoteRequest
         }
         else if(method.equalsIgnoreCase("HEAD"))
         {
-            HeadMethod head = new HeadMethod(url.toString());
+            HttpHead head = new HttpHead(url.toString());
             httpMethod = head;
-            httpMethod.setFollowRedirects(true);
         }
         else
         {
@@ -180,7 +147,7 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
         {
             for (Map.Entry<String, String> header : req.getHeaders().entrySet())
             {
-                httpMethod.setRequestHeader(header.getKey(), header.getValue());
+                httpMethod.setHeader(header.getKey(), header.getValue());
             }
         }
         
@@ -193,13 +160,18 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
     @Override
     public void close()
     {
-       if(httpClient != null)
+       if(httpClient != null && httpClient instanceof CloseableHttpClient)
        {
-           HttpConnectionManager connectionManager = httpClient.getHttpConnectionManager();
-           if(connectionManager instanceof MultiThreadedHttpConnectionManager)
-           {
-               ((MultiThreadedHttpConnectionManager)connectionManager).shutdown();
-           }
+           try {
+			((CloseableHttpClient)httpClient).close();
+		} catch (IOException e) {
+			// ignore for now
+		}
+//           HttpConnectionManager connectionManager = httpClient.getHttpConnectionManager();
+//           if(connectionManager instanceof MultiThreadedHttpConnectionManager)
+//           {
+//               ((MultiThreadedHttpConnectionManager)connectionManager).shutdown();
+//           }
        }
         
     }

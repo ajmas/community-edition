@@ -1,17 +1,18 @@
 package org.alfresco.httpclient;
 
-import org.apache.commons.httpclient.HttpMethod;
+import org.apache.http.HttpResponse;
 
+@SuppressWarnings("serial")
 public class AuthenticationException extends Exception
 {
-	private HttpMethod method;
+	private HttpResponse method;
 
-	public AuthenticationException(HttpMethod method)
+	public AuthenticationException(HttpResponse method)
 	{
 		this.method = method;
 	}
 
-	public HttpMethod getMethod()
+	public HttpResponse getMethod()
 	{
 		return method;
 	}

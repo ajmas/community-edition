@@ -21,8 +21,9 @@ package org.alfresco.httpclient;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpMethod;
+import org.apache.http.Header;
+import org.apache.http.HttpResponse;
+import org.apache.http.util.EntityUtils;
 
 /**
  * 
@@ -31,21 +32,25 @@ import org.apache.commons.httpclient.HttpMethod;
  */
 public class HttpMethodResponse implements Response
 {
-	protected HttpMethod method;
+	protected HttpResponse method;
 
-    public HttpMethodResponse(HttpMethod method) throws IOException
+    public HttpMethodResponse(HttpResponse method) throws IOException
     {
         this.method = method;
     }
     
     public void release()
     {
-    	method.releaseConnection();
+    	try {
+    		EntityUtils.consume(method.getEntity());
+		} catch (IOException e) {
+			// TODO deal with exception
+		}
     }
 
     public InputStream getContentAsStream() throws IOException
     {
-    	return method.getResponseBodyAsStream();
+    	return method.getEntity().getContent();
     }
 
     public String getContentType()
@@ -55,13 +60,13 @@ public class HttpMethodResponse implements Response
 
     public String getHeader(String name)
     {
-        Header header = method.getResponseHeader(name);
+        Header header = method.getFirstHeader(name);
         return (header != null) ? header.getValue() : null;
     }
 
     public int getStatus()
     {
-        return method.getStatusCode();
+        return method.getStatusLine().getStatusCode();
     }
 
 }

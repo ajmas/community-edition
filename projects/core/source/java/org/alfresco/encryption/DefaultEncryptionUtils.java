@@ -37,6 +37,7 @@ import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.springframework.extensions.surf.util.Base64;
 import org.springframework.util.FileCopyUtils;
 
@@ -114,13 +115,13 @@ public class DefaultEncryptionUtils implements EncryptionUtils
 		this.macUtils = macUtils;
 	}
 
-    protected void setRequestMac(HttpMethod method, byte[] mac)
+    protected void setRequestMac(HttpUriRequest method, byte[] mac)
     {
     	if(mac == null)
     	{
     		throw new AlfrescoRuntimeException("Mac cannot be null");
     	}
-        method.setRequestHeader(HEADER_MAC, Base64.encodeBytes(mac));	
+        method.setHeader(HEADER_MAC, Base64.encodeBytes(mac));	
     }
 
     /**
@@ -184,9 +185,9 @@ public class DefaultEncryptionUtils implements EncryptionUtils
 	 * @param method
 	 * @param timestamp (ms, in UNIX time)
 	 */
-	protected void setRequestTimestamp(HttpMethod method, long timestamp)
+	protected void setRequestTimestamp(HttpUriRequest method, long timestamp)
 	{
-        method.setRequestHeader(HEADER_TIMESTAMP, String.valueOf(timestamp));		
+        method.setHeader(HEADER_TIMESTAMP, String.valueOf(timestamp));		
 	}
 
 	/**
@@ -243,11 +244,11 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * {@inheritDoc}
      */
     @Override
-    public void setRequestAlgorithmParameters(HttpMethod method, AlgorithmParameters params) throws IOException
+    public void setRequestAlgorithmParameters(HttpUriRequest method, AlgorithmParameters params) throws IOException
     {
     	if(params != null)
     	{
-    		method.setRequestHeader(HEADER_ALGORITHM_PARAMETERS, Base64.encodeBytes(params.getEncoded()));
+    		method.setHeader(HEADER_ALGORITHM_PARAMETERS, Base64.encodeBytes(params.getEncoded()));
     	}
     }
     
@@ -419,7 +420,7 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * {@inheritDoc}
      */
     @Override
-    public void setRequestAuthentication(HttpMethod method, byte[] message) throws IOException
+    public void setRequestAuthentication(HttpUriRequest method, byte[] message) throws IOException
     {
 	    long requestTimestamp = System.currentTimeMillis();
 	
@@ -428,8 +429,8 @@ public class DefaultEncryptionUtils implements EncryptionUtils
 	
 		if(logger.isDebugEnabled())
 		{
-			logger.debug("Setting MAC " + Arrays.toString(mac) + " on HTTP request " + method.getPath());
-			logger.debug("Setting timestamp " + requestTimestamp + " on HTTP request " + method.getPath());
+			logger.debug("Setting MAC " + Arrays.toString(mac) + " on HTTP request " + method.getURI().getPath());
+			logger.debug("Setting timestamp " + requestTimestamp + " on HTTP request " + method.getURI().getPath());
 		}
 	    
 	    setRequestMac(method, mac);

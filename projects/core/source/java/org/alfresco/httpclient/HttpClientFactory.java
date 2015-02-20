@@ -40,32 +40,44 @@ import org.alfresco.encryption.ssl.AuthSSLProtocolSocketFactory;
 import org.alfresco.encryption.ssl.SSLEncryptionParameters;
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.util.Pair;
-import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-import org.apache.commons.httpclient.HostConfiguration;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpHost;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.HttpVersion;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.URIException;
-import org.apache.commons.httpclient.cookie.CookiePolicy;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.params.DefaultHttpParams;
-import org.apache.commons.httpclient.params.DefaultHttpParamsFactory;
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.apache.commons.httpclient.params.HttpConnectionManagerParams;
-import org.apache.commons.httpclient.params.HttpConnectionParams;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.httpclient.params.HttpParams;
-import org.apache.commons.httpclient.protocol.Protocol;
-import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
-import org.apache.commons.httpclient.util.DateUtil;
+//import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+//import org.apache.commons.httpclient.HostConfiguration;
+//import org.apache.commons.httpclient.HttpClient;
+//import org.apache.commons.httpclient.HttpHost;
+//import org.apache.commons.httpclient.HttpMethod;
+//import org.apache.commons.httpclient.HttpStatus;
+//import org.apache.commons.httpclient.HttpVersion;
+//import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+//import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+//import org.apache.commons.httpclient.URI;
+//import org.apache.commons.httpclient.URIException;
+//import org.apache.commons.httpclient.cookie.CookiePolicy;
+//import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
+//import org.apache.commons.httpclient.methods.PostMethod;
+//import org.apache.commons.httpclient.params.DefaultHttpParams;
+//import org.apache.commons.httpclient.params.DefaultHttpParamsFactory;
+//import org.apache.commons.httpclient.params.HttpClientParams;
+//import org.apache.commons.httpclient.params.HttpConnectionManagerParams;
+//import org.apache.commons.httpclient.params.HttpConnectionParams;
+//import org.apache.commons.httpclient.params.HttpMethodParams;
+//import org.apache.commons.httpclient.params.HttpParams;
+//import org.apache.commons.httpclient.protocol.Protocol;
+//import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
+//import org.apache.commons.httpclient.util.DateUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.params.CookiePolicy;
+import org.apache.http.client.params.HttpClientParams;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.ContentType;
+import org.apache.http.params.CoreProtocolPNames;
+import org.apache.http.params.HttpParams;
 
 /**
  * A factory to create HttpClients and AlfrescoHttpClients based on the setting of the 'secureCommsType' property.
@@ -251,6 +263,7 @@ public class HttpClientFactory
 
     protected HttpClient constructHttpClient()
     {
+    	
         MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
         HttpClient httpClient = new HttpClient(connectionManager);
         HttpClientParams params = httpClient.getParams();
@@ -382,7 +395,7 @@ public class HttpClientFactory
          */
         public Response sendRequest(Request req) throws AuthenticationException, IOException
         {
-            HttpMethod method = super.sendRemoteRequest(req);
+        	HttpResponse method = super.sendRemoteRequest(req);
             return new HttpMethodResponse(method);
         }
     }
@@ -404,7 +417,7 @@ public class HttpClientFactory
          */
         public Response sendRequest(Request req) throws AuthenticationException, IOException
         {
-            HttpMethod method = super.sendRemoteRequest(req);
+            HttpResponse method = super.sendRemoteRequest(req);
             return new HttpMethodResponse(method);
         }
     }
@@ -445,10 +458,10 @@ public class HttpClientFactory
             this.encryptor = encryptionService.getEncryptor();
         }
         
-        protected HttpMethod createMethod(Request req) throws IOException
+        protected HttpUriRequest createMethod(Request req) throws IOException
         {
             byte[] message = null;
-            HttpMethod method = super.createMethod(req);
+            HttpUriRequest method = super.createMethod(req);
 
             if(req.getMethod().equalsIgnoreCase("POST"))
             {
@@ -457,9 +470,9 @@ public class HttpClientFactory
                 Pair<byte[], AlgorithmParameters> encrypted = encryptor.encrypt(KeyProvider.ALIAS_SOLR, null, message);
                 encryptionUtils.setRequestAlgorithmParameters(method, encrypted.getSecond());
                 
-                ((PostMethod)method).getParams().setBooleanParameter(HttpMethodParams.USE_EXPECT_CONTINUE, encrypted.getFirst().length > DEFAULT_SAVEPOST_BUFFER);
-                ByteArrayRequestEntity requestEntity = new ByteArrayRequestEntity(encrypted.getFirst(), "application/octet-stream");
-                ((PostMethod)method).setRequestEntity(requestEntity);
+                ((HttpPost)method).getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, encrypted.getFirst().length > DEFAULT_SAVEPOST_BUFFER);
+                ByteArrayEntity requestEntity = new ByteArrayEntity(encrypted.getFirst(), ContentType.create("application/octet-stream"));
+                ((HttpPost)method).setEntity(requestEntity);
             }
 
             encryptionUtils.setRequestAuthentication(method, message);
@@ -467,12 +480,12 @@ public class HttpClientFactory
             return method;
         }
         
-        protected HttpMethod sendRemoteRequest(Request req) throws AuthenticationException, IOException
+        protected HttpResponse sendRemoteRequest(Request req) throws AuthenticationException, IOException
         {
-            HttpMethod method = super.sendRemoteRequest(req);
+        	HttpResponse method = super.sendRemoteRequest(req);
 
             // check that the request returned with an ok status
-            if(method.getStatusCode() == HttpStatus.SC_UNAUTHORIZED)
+            if(method.getStatusLine().getStatusCode() == HttpStatus.SC_UNAUTHORIZED)
             {
                 throw new AuthenticationException(method);
             }
@@ -485,7 +498,7 @@ public class HttpClientFactory
          */
         public Response sendRequest(Request req) throws AuthenticationException, IOException
         {
-            HttpMethod method = super.sendRemoteRequest(req);
+        	HttpResponse method = super.sendRemoteRequest(req);
             return new SecureHttpMethodResponse(method, httpClient.getHostConfiguration(), encryptionUtils);
         }
     }
@@ -498,7 +511,7 @@ public class HttpClientFactory
         // and again by the web service.
         protected byte[] decryptedBody;
 
-        public SecureHttpMethodResponse(HttpMethod method, HostConfiguration hostConfig, 
+        public SecureHttpMethodResponse(HttpResponse method, HostConfiguration hostConfig, 
                 EncryptionUtils encryptionUtils) throws AuthenticationException, IOException
         {
             super(method);
@@ -595,239 +608,239 @@ public class HttpClientFactory
         }
     }
 
-    /**
-     * An extension of the DefaultHttpParamsFactory that uses a RRW lock pattern rather than
-     * full synchronization around the parameter CRUD - to avoid locking on many reads. 
-     * 
-     * @author Kevin Roast
-     */
-    public static class NonBlockingHttpParamsFactory extends DefaultHttpParamsFactory
-    {
-        private volatile HttpParams httpParams;
-        
-        /* (non-Javadoc)
-         * @see org.apache.commons.httpclient.params.DefaultHttpParamsFactory#getDefaultParams()
-         */
-        @Override
-        public HttpParams getDefaultParams()
-        {
-            if (httpParams == null)
-            {
-                synchronized (this)
-                {
-                    if (httpParams == null)
-                    {
-                        httpParams = createParams();
-                    }
-                }
-            }
-            
-            return httpParams;
-        }
-        
-        /**
-         * NOTE: This is a copy of the code in {@link DefaultHttpParamsFactory}
-         *       Unfortunately this is required because although the factory pattern allows the 
-         *       override of the default param creation, it does not allow the class of the actual
-         *       HttpParam implementation to be changed.
-         */
-        @Override
-        protected HttpParams createParams()
-        {
-            HttpClientParams params = new NonBlockingHttpParams(null);
-            
-            params.setParameter(HttpMethodParams.USER_AGENT, "Spring Surf via Apache HttpClient/3.1");
-            params.setVersion(HttpVersion.HTTP_1_1);
-            params.setConnectionManagerClass(SimpleHttpConnectionManager.class);
-            params.setCookiePolicy(CookiePolicy.IGNORE_COOKIES);
-            params.setHttpElementCharset("US-ASCII");
-            params.setContentCharset("ISO-8859-1");
-            params.setParameter(HttpMethodParams.RETRY_HANDLER, new DefaultHttpMethodRetryHandler());
-            
-            List<String> datePatterns = Arrays.asList(
-                    new String[] {
-                            DateUtil.PATTERN_RFC1123,
-                            DateUtil.PATTERN_RFC1036,
-                            DateUtil.PATTERN_ASCTIME,
-                            "EEE, dd-MMM-yyyy HH:mm:ss z",
-                            "EEE, dd-MMM-yyyy HH-mm-ss z",
-                            "EEE, dd MMM yy HH:mm:ss z",
-                            "EEE dd-MMM-yyyy HH:mm:ss z",
-                            "EEE dd MMM yyyy HH:mm:ss z",
-                            "EEE dd-MMM-yyyy HH-mm-ss z",
-                            "EEE dd-MMM-yy HH:mm:ss z",
-                            "EEE dd MMM yy HH:mm:ss z",
-                            "EEE,dd-MMM-yy HH:mm:ss z",
-                            "EEE,dd-MMM-yyyy HH:mm:ss z",
-                            "EEE, dd-MM-yyyy HH:mm:ss z",                
-                    }
-            );
-            params.setParameter(HttpMethodParams.DATE_PATTERNS, datePatterns);
-            
-            String agent = null;
-            try
-            {
-                agent = System.getProperty("httpclient.useragent");
-            }
-            catch (SecurityException ignore)
-            {
-            }
-            if (agent != null)
-            {
-                params.setParameter(HttpMethodParams.USER_AGENT, agent);
-            }
-            
-            String preemptiveDefault = null;
-            try
-            {
-                preemptiveDefault = System.getProperty("httpclient.authentication.preemptive");
-            }
-            catch (SecurityException ignore)
-            {
-            }
-            if (preemptiveDefault != null)
-            {
-                preemptiveDefault = preemptiveDefault.trim().toLowerCase();
-                if (preemptiveDefault.equals("true"))
-                {
-                    params.setParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, Boolean.TRUE);
-                }
-                else if (preemptiveDefault.equals("false"))
-                {
-                    params.setParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, Boolean.FALSE);
-                }
-            }
-            
-            String defaultCookiePolicy = null;
-            try
-            {
-                defaultCookiePolicy = System.getProperty("apache.commons.httpclient.cookiespec");
-            }
-            catch (SecurityException ignore)
-            {
-            }
-            if (defaultCookiePolicy != null)
-            {
-                if ("COMPATIBILITY".equalsIgnoreCase(defaultCookiePolicy))
-                {
-                    params.setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
-                }
-                else if ("NETSCAPE_DRAFT".equalsIgnoreCase(defaultCookiePolicy))
-                {
-                    params.setCookiePolicy(CookiePolicy.NETSCAPE);
-                }
-                else if ("RFC2109".equalsIgnoreCase(defaultCookiePolicy))
-                {
-                    params.setCookiePolicy(CookiePolicy.RFC_2109);
-                }
-            }
-            
-            return params;
-        }
-    }
+//    /**
+//     * An extension of the DefaultHttpParamsFactory that uses a RRW lock pattern rather than
+//     * full synchronization around the parameter CRUD - to avoid locking on many reads. 
+//     * 
+//     * @author Kevin Roast
+//     */
+//    public static class NonBlockingHttpParamsFactory extends DefaultHttpParamsFactory
+//    {
+//        private volatile HttpParams httpParams;
+//        
+//        /* (non-Javadoc)
+//         * @see org.apache.commons.httpclient.params.DefaultHttpParamsFactory#getDefaultParams()
+//         */
+//        @Override
+//        public HttpParams getDefaultParams()
+//        {
+//            if (httpParams == null)
+//            {
+//                synchronized (this)
+//                {
+//                    if (httpParams == null)
+//                    {
+//                        httpParams = createParams();
+//                    }
+//                }
+//            }
+//            
+//            return httpParams;
+//        }
+//        
+//        /**
+//         * NOTE: This is a copy of the code in {@link DefaultHttpParamsFactory}
+//         *       Unfortunately this is required because although the factory pattern allows the 
+//         *       override of the default param creation, it does not allow the class of the actual
+//         *       HttpParam implementation to be changed.
+//         */
+//        @Override
+//        protected HttpParams createParams()
+//        {
+//            HttpClientParams params = new NonBlockingHttpParams(null);
+//            
+//            params.setParameter(HttpMethodParams.USER_AGENT, "Spring Surf via Apache HttpClient/3.1");
+//            params.setVersion(HttpVersion.HTTP_1_1);
+//            params.setConnectionManagerClass(SimpleHttpConnectionManager.class);
+//            params.setCookiePolicy(CookiePolicy.IGNORE_COOKIES);
+//            params.setHttpElementCharset("US-ASCII");
+//            params.setContentCharset("ISO-8859-1");
+//            params.setParameter(HttpMethodParams.RETRY_HANDLER, new DefaultHttpMethodRetryHandler());
+//            
+//            List<String> datePatterns = Arrays.asList(
+//                    new String[] {
+//                            DateUtil.PATTERN_RFC1123,
+//                            DateUtil.PATTERN_RFC1036,
+//                            DateUtil.PATTERN_ASCTIME,
+//                            "EEE, dd-MMM-yyyy HH:mm:ss z",
+//                            "EEE, dd-MMM-yyyy HH-mm-ss z",
+//                            "EEE, dd MMM yy HH:mm:ss z",
+//                            "EEE dd-MMM-yyyy HH:mm:ss z",
+//                            "EEE dd MMM yyyy HH:mm:ss z",
+//                            "EEE dd-MMM-yyyy HH-mm-ss z",
+//                            "EEE dd-MMM-yy HH:mm:ss z",
+//                            "EEE dd MMM yy HH:mm:ss z",
+//                            "EEE,dd-MMM-yy HH:mm:ss z",
+//                            "EEE,dd-MMM-yyyy HH:mm:ss z",
+//                            "EEE, dd-MM-yyyy HH:mm:ss z",                
+//                    }
+//            );
+//            params.setParameter(HttpMethodParams.DATE_PATTERNS, datePatterns);
+//            
+//            String agent = null;
+//            try
+//            {
+//                agent = System.getProperty("httpclient.useragent");
+//            }
+//            catch (SecurityException ignore)
+//            {
+//            }
+//            if (agent != null)
+//            {
+//                params.setParameter(HttpMethodParams.USER_AGENT, agent);
+//            }
+//            
+//            String preemptiveDefault = null;
+//            try
+//            {
+//                preemptiveDefault = System.getProperty("httpclient.authentication.preemptive");
+//            }
+//            catch (SecurityException ignore)
+//            {
+//            }
+//            if (preemptiveDefault != null)
+//            {
+//                preemptiveDefault = preemptiveDefault.trim().toLowerCase();
+//                if (preemptiveDefault.equals("true"))
+//                {
+//                    params.setParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, Boolean.TRUE);
+//                }
+//                else if (preemptiveDefault.equals("false"))
+//                {
+//                    params.setParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, Boolean.FALSE);
+//                }
+//            }
+//            
+//            String defaultCookiePolicy = null;
+//            try
+//            {
+//                defaultCookiePolicy = System.getProperty("apache.commons.httpclient.cookiespec");
+//            }
+//            catch (SecurityException ignore)
+//            {
+//            }
+//            if (defaultCookiePolicy != null)
+//            {
+//                if ("COMPATIBILITY".equalsIgnoreCase(defaultCookiePolicy))
+//                {
+//                    params.setCookiePolicy(CookiePolicy.BROWSER_COMPATIBILITY);
+//                }
+//                else if ("NETSCAPE_DRAFT".equalsIgnoreCase(defaultCookiePolicy))
+//                {
+//                    params.setCookiePolicy(CookiePolicy.NETSCAPE);
+//                }
+//                else if ("RFC2109".equalsIgnoreCase(defaultCookiePolicy))
+//                {
+//                    params.setCookiePolicy(CookiePolicy.RFC_2109);
+//                }
+//            }
+//            
+//            return params;
+//        }
+//    }
     
-    /**
-     * @author Kevin Roast
-     */
-    public static class NonBlockingHttpParams extends HttpClientParams
-    {
-        private HashMap<String, Object> parameters = new HashMap<String, Object>(8);
-        private ReadWriteLock paramLock = new ReentrantReadWriteLock();
-        
-        public NonBlockingHttpParams()
-        {
-            super();
-        }
-        
-        public NonBlockingHttpParams(HttpParams defaults)
-        {
-            super(defaults);
-        }
-        
-        @Override
-        public Object getParameter(final String name)
-        {
-            // See if the parameter has been explicitly defined
-            Object param = null;
-            paramLock.readLock().lock();
-            try
-            {
-                param = this.parameters.get(name);
-            }
-            finally
-            {
-                paramLock.readLock().unlock();
-            }
-            if (param == null)
-            {
-                // If not, see if defaults are available
-                HttpParams defaults = getDefaults();
-                if (defaults != null)
-                {
-                    // Return default parameter value
-                    param = defaults.getParameter(name);
-                }
-            }
-            return param;
-        }
-        
-        @Override
-        public void setParameter(final String name, final Object value)
-        {
-            paramLock.writeLock().lock();
-            try
-            {
-                this.parameters.put(name, value);
-            }
-            finally
-            {
-                paramLock.writeLock().unlock();
-            }
-        }
-        
-        @Override
-        public boolean isParameterSetLocally(final String name)
-        {
-            paramLock.readLock().lock();
-            try
-            {
-                return (this.parameters.get(name) != null);
-            }
-            finally
-            {
-                paramLock.readLock().unlock();
-            }
-        }
-        
-        @Override
-        public void clear()
-        {
-            paramLock.writeLock().lock();
-            try
-            {
-                this.parameters.clear();
-            }
-            finally
-            {
-                paramLock.writeLock().unlock();
-            }
-        }
-        
-        @Override
-        public Object clone() throws CloneNotSupportedException
-        {
-            NonBlockingHttpParams clone = (NonBlockingHttpParams)super.clone();
-            paramLock.readLock().lock();
-            try
-            {
-                clone.parameters = (HashMap) this.parameters.clone();
-            }
-            finally
-            {
-                paramLock.readLock().unlock();
-            }
-            clone.setDefaults(getDefaults());
-            return clone;
-        }
-    }
+//    /**
+//     * @author Kevin Roast
+//     */
+//    public static class NonBlockingHttpParams extends HttpClientParams
+//    {
+//        private HashMap<String, Object> parameters = new HashMap<String, Object>(8);
+//        private ReadWriteLock paramLock = new ReentrantReadWriteLock();
+//        
+//        public NonBlockingHttpParams()
+//        {
+//            super();
+//        }
+//        
+//        public NonBlockingHttpParams(HttpParams defaults)
+//        {
+//            super(defaults);
+//        }
+//        
+//        @Override
+//        public Object getParameter(final String name)
+//        {
+//            // See if the parameter has been explicitly defined
+//            Object param = null;
+//            paramLock.readLock().lock();
+//            try
+//            {
+//                param = this.parameters.get(name);
+//            }
+//            finally
+//            {
+//                paramLock.readLock().unlock();
+//            }
+//            if (param == null)
+//            {
+//                // If not, see if defaults are available
+//                HttpParams defaults = getDefaults();
+//                if (defaults != null)
+//                {
+//                    // Return default parameter value
+//                    param = defaults.getParameter(name);
+//                }
+//            }
+//            return param;
+//        }
+//        
+//        @Override
+//        public void setParameter(final String name, final Object value)
+//        {
+//            paramLock.writeLock().lock();
+//            try
+//            {
+//                this.parameters.put(name, value);
+//            }
+//            finally
+//            {
+//                paramLock.writeLock().unlock();
+//            }
+//        }
+//        
+//        @Override
+//        public boolean isParameterSetLocally(final String name)
+//        {
+//            paramLock.readLock().lock();
+//            try
+//            {
+//                return (this.parameters.get(name) != null);
+//            }
+//            finally
+//            {
+//                paramLock.readLock().unlock();
+//            }
+//        }
+//        
+//        @Override
+//        public void clear()
+//        {
+//            paramLock.writeLock().lock();
+//            try
+//            {
+//                this.parameters.clear();
+//            }
+//            finally
+//            {
+//                paramLock.writeLock().unlock();
+//            }
+//        }
+//        
+//        @Override
+//        public Object clone() throws CloneNotSupportedException
+//        {
+//            NonBlockingHttpParams clone = (NonBlockingHttpParams)super.clone();
+//            paramLock.readLock().lock();
+//            try
+//            {
+//                clone.parameters = (HashMap) this.parameters.clone();
+//            }
+//            finally
+//            {
+//                paramLock.readLock().unlock();
+//            }
+//            clone.setDefaults(getDefaults());
+//            return clone;
+//        }
+//    }
 }

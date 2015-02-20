@@ -25,6 +25,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.httpclient.HttpMethod;
+import org.apache.http.client.methods.HttpUriRequest;
 
 /**
  * Various encryption utility methods.
@@ -80,7 +81,7 @@ public interface EncryptionUtils
      * @param message
      * @throws IOException
      */
-    public void setRequestAuthentication(HttpMethod method, byte[] message) throws IOException;
+    public void setRequestAuthentication(HttpUriRequest method, byte[] message) throws IOException;
 
     /**
      * Sets authentication headers on the HTTP response.
@@ -101,5 +102,5 @@ public interface EncryptionUtils
      * @param params
      * @throws IOException
      */
-    public void setRequestAlgorithmParameters(HttpMethod method, AlgorithmParameters params) throws IOException;
+    public void setRequestAlgorithmParameters(HttpUriRequest method, AlgorithmParameters params) throws IOException;
 }
