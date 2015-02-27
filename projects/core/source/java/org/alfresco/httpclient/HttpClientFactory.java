@@ -247,9 +247,13 @@ public class HttpClientFactory
     			.setMaxConnTotal(maxTotalConnections)
     			.setMaxConnPerRoute(maxHostConnections)
     			.setDefaultRequestConfig(requestConfig)
-    			.setDefaultSocketConfig(socketConfig);
-    	
-    			
+    			.setDefaultSocketConfig(socketConfig);    	    			
+    }
+    
+    protected HttpClientBuilder getBaseHttpsClientBuilder()
+    {
+    	return getBaseHttpClientBuilder()
+    			.setSSLSocketFactory(sslSocketFactory);
     }
     
     protected HttpClient constructHttpClient()
@@ -352,6 +356,25 @@ public class HttpClientFactory
         return httpClient;
     }
     
+    public HttpClientBuilder getHttpClientBuilder()
+    {
+        HttpClientBuilder httpClientBuilder = null;
+
+        if(secureCommsType == SecureCommsType.HTTPS)
+        {
+        	httpClientBuilder = getBaseHttpsClientBuilder();
+        }
+        else if(secureCommsType == SecureCommsType.NONE)
+        {
+        	httpClientBuilder = getBaseHttpClientBuilder();
+        }
+        else
+        {
+            throw new AlfrescoRuntimeException("Invalid Solr secure communications type configured in alfresco.secureComms, should be 'ssl'or 'none'");
+        }
+
+        return httpClientBuilder;
+    }
 
     
     /**

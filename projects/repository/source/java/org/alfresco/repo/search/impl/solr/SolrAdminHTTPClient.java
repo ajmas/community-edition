@@ -24,44 +24,28 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
 
 import javax.servlet.http.HttpServletResponse;
 
-import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.httpclient.HttpClientFactory;
-import org.alfresco.repo.domain.node.NodeDAO;
 import org.alfresco.repo.search.impl.lucene.LuceneQueryParserException;
-import org.alfresco.repo.search.impl.lucene.SolrJSONResultSet;
-import org.alfresco.service.cmr.repository.datatype.DefaultTypeConverter;
-import org.alfresco.service.cmr.search.ResultSet;
-import org.alfresco.service.cmr.search.SearchParameters;
-import org.alfresco.service.cmr.search.SearchParameters.FieldFacet;
-import org.alfresco.service.cmr.search.SearchParameters.FieldFacetMethod;
-import org.alfresco.service.cmr.search.SearchParameters.FieldFacetSort;
-import org.alfresco.service.cmr.search.SearchParameters.SortDefinition;
-import org.alfresco.service.cmr.security.PermissionService;
 import org.alfresco.util.ParameterCheck;
 import org.apache.commons.codec.net.URLCodec;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.json.JSONArray;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONTokener;
-import org.springframework.extensions.surf.util.I18NUtil;
 
 /**
  * @author Andy
@@ -95,10 +79,13 @@ public class SolrAdminHTTPClient
     	sb.append(baseUrl + "/admin/cores");
     	this.adminUrl = sb.toString();
 
-    	httpClient = httpClientFactory.getHttpClient();
-    	HttpClientParams params = httpClient.getParams();
-    	params.setBooleanParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, true);
-    	httpClient.getState().setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), new UsernamePasswordCredentials("admin", "admin"));
+    	HttpClientBuilder httpClientBuilder = httpClientFactory.getHttpClientBuilder();
+    	
+    	CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    	credentialsProvider.setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), new UsernamePasswordCredentials("admin", "admin"));
+    	httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+    	
+    	httpClient = httpClientBuilder.build();    	
     }
 
     public void setHttpClientFactory(HttpClientFactory httpClientFactory)
@@ -144,31 +131,24 @@ public class SolrAdminHTTPClient
             }
 
             // PostMethod post = new PostMethod(url.toString());
-            GetMethod get = new GetMethod(url.toString());
+            HttpGet get = new HttpGet(url.toString());
 
             try
             {
-                httpClient.executeMethod(get);
+                HttpResponse response = httpClient.execute(get);
 
-                if (get.getStatusCode() == HttpStatus.SC_MOVED_PERMANENTLY || get.getStatusCode() == HttpStatus.SC_MOVED_TEMPORARILY)
+                // Note: redirection is now handled by HttpClient               
+
+                if (response.getStatusLine().getStatusCode() != HttpServletResponse.SC_OK)
                 {
-                    Header locationHeader = get.getResponseHeader("location");
-                    if (locationHeader != null)
-                    {
-                        String redirectLocation = locationHeader.getValue();
-                        get.setURI(new URI(redirectLocation, true));
-                        httpClient.executeMethod(get);
-                    }
+                    throw new LuceneQueryParserException("Request failed " + response.getStatusLine().getStatusCode() + " " + url.toString());
                 }
 
-                if (get.getStatusCode() != HttpServletResponse.SC_OK)
-                {
-                    throw new LuceneQueryParserException("Request failed " + get.getStatusCode() + " " + url.toString());
-                }
-
-                Reader reader = new BufferedReader(new InputStreamReader(get.getResponseBodyAsStream()));
+                HttpEntity entity = response.getEntity();
+                Reader reader = new BufferedReader(new InputStreamReader(entity.getContent()));
                 // TODO - replace with streaming-based solution e.g. SimpleJSON ContentHandler
-                JSONObject json = new JSONObject(new JSONTokener(reader));
+                JSONObject json = new JSONObject(new JSONTokener(reader));                
+                EntityUtils.consumeQuietly(entity);
                 return json;
             }
             finally
@@ -177,10 +157,6 @@ public class SolrAdminHTTPClient
             }
         }
         catch (UnsupportedEncodingException e)
-        {
-            throw new LuceneQueryParserException("", e);
-        }
-        catch (HttpException e)
         {
             throw new LuceneQueryParserException("", e);
         }
