@@ -2,6 +2,8 @@ package org.alfresco.httpclient;
 
 import java.io.IOException;
 
+import org.apache.http.ProtocolException;
+
 /**
  * 
  * @since 4.0
@@ -12,7 +14,7 @@ public interface AlfrescoHttpClient
     /**
      * Send Request to the repository
      */
-    public Response sendRequest(Request req) throws AuthenticationException, IOException;
+    public Response sendRequest(Request req) throws AuthenticationException, ProtocolException, IOException;
     
     
     /**

@@ -28,12 +28,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import org.alfresco.error.AlfrescoRuntimeException;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.DateTimeFormatterBuilder;
 import org.joda.time.format.ISODateTimeFormat;
-import org.springframework.extensions.surf.exception.PlatformRuntimeException;
 
 /**
  * Provides <b>thread safe</b> means of obtaining a cached date formatter.

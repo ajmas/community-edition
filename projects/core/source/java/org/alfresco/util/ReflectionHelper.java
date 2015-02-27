@@ -55,7 +55,7 @@ public class ReflectionHelper
 
         try
         {
-            Class clazz = Class.forName(className);
+            Class<?> clazz = Class.forName(className);
             o = clazz.newInstance();
         }
         catch (ClassNotFoundException cnfe)
@@ -96,7 +96,7 @@ public class ReflectionHelper
      * @param args
      * @return
      */
-    public static Object newObject(String className, Class[] argTypes, Object[] args)
+    public static Object newObject(String className, Class<?>[] argTypes, Object[] args)
     {
         /**
          * We have some mercy here - if they called and did not pass in any
@@ -116,9 +116,9 @@ public class ReflectionHelper
         try
         {
             // base class
-            Class clazz = Class.forName(className);
+            Class<?> clazz = Class.forName(className);
 
-            Constructor c = clazz.getDeclaredConstructor(argTypes);
+            Constructor<?> c = clazz.getDeclaredConstructor(argTypes);
             o = c.newInstance(args);
         }
         catch (ClassNotFoundException cnfe)
@@ -154,7 +154,7 @@ public class ReflectionHelper
      * @param args
      * @return
      */
-    public static Object invoke(Object obj, String method, Class[] argTypes, Object[] args)
+    public static Object invoke(Object obj, String method, Class<?>[] argTypes, Object[] args)
     {
         if (obj == null || method == null)
         {

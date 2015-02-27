@@ -78,7 +78,7 @@ public class Debug
    {
       String result = "Could not determine class loader for " + className;
       
-      Class clazz = Class.forName(className);
+      Class<?> clazz = Class.forName(className);
       ClassLoader loader = clazz.getClassLoader();
       
       if (loader != null)
@@ -99,7 +99,7 @@ public class Debug
    public static String whichClassLoaderHierarchy(String className) throws ClassNotFoundException
    {
       StringBuffer buffer = new StringBuffer();
-      Class clazz = Class.forName(className);
+      Class<?> clazz = Class.forName(className);
       ClassLoader loader = clazz.getClassLoader();
       if (loader != null)
       {

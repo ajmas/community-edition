@@ -65,7 +65,7 @@ public final class ParameterCheck
      * @param strParamName Name of parameter to check
      * @param coll collection to check
      */
-    public static final void mandatoryCollection(final String strParamName, final Collection coll)
+    public static final void mandatoryCollection(final String strParamName, final Collection<?> coll)
     {
         if (coll == null || coll.size() == 0)
         {

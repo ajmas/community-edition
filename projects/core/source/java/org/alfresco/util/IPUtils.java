@@ -15,7 +15,7 @@ public class IPUtils
 	 */
 	public static String getRealIPAddress(String ipAddress) throws UnknownHostException
 	{
-		if(ipAddress.equals("localhost") || ipAddress.equals("127.0.0.1"))
+		if(ipAddress.equals("localhost") || ipAddress.equals("127.0.0.1") || ipAddress.equals("::1")  || ipAddress.equals("[::1]"))
 		{
 			// make sure we are using a "real" IP address
 			ipAddress = InetAddress.getLocalHost().getHostAddress();

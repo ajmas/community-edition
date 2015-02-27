@@ -21,13 +21,9 @@ package org.alfresco.httpclient;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.AlgorithmParameters;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.alfresco.encryption.AlfrescoKeyStore;
 import org.alfresco.encryption.AlfrescoKeyStoreImpl;
@@ -40,44 +36,19 @@ import org.alfresco.encryption.ssl.AuthSSLProtocolSocketFactory;
 import org.alfresco.encryption.ssl.SSLEncryptionParameters;
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.util.Pair;
-//import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-//import org.apache.commons.httpclient.HostConfiguration;
-//import org.apache.commons.httpclient.HttpClient;
-//import org.apache.commons.httpclient.HttpHost;
-//import org.apache.commons.httpclient.HttpMethod;
-//import org.apache.commons.httpclient.HttpStatus;
-//import org.apache.commons.httpclient.HttpVersion;
-//import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-//import org.apache.commons.httpclient.SimpleHttpConnectionManager;
-//import org.apache.commons.httpclient.URI;
-//import org.apache.commons.httpclient.URIException;
-//import org.apache.commons.httpclient.cookie.CookiePolicy;
-//import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-//import org.apache.commons.httpclient.methods.PostMethod;
-//import org.apache.commons.httpclient.params.DefaultHttpParams;
-//import org.apache.commons.httpclient.params.DefaultHttpParamsFactory;
-//import org.apache.commons.httpclient.params.HttpClientParams;
-//import org.apache.commons.httpclient.params.HttpConnectionManagerParams;
-//import org.apache.commons.httpclient.params.HttpConnectionParams;
-//import org.apache.commons.httpclient.params.HttpMethodParams;
-//import org.apache.commons.httpclient.params.HttpParams;
-//import org.apache.commons.httpclient.protocol.Protocol;
-//import org.apache.commons.httpclient.protocol.ProtocolSocketFactory;
-//import org.apache.commons.httpclient.util.DateUtil;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
+import org.apache.http.ProtocolException;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.params.CookiePolicy;
-import org.apache.http.client.params.HttpClientParams;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
-import org.apache.http.params.CoreProtocolPNames;
-import org.apache.http.params.HttpParams;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.LaxRedirectStrategy;
 
 /**
  * A factory to create HttpClients and AlfrescoHttpClients based on the setting of the 'secureCommsType' property.
@@ -107,8 +78,6 @@ public class HttpClientFactory
         }
     };
 
-    private static final Log logger = LogFactory.getLog(HttpClientFactory.class);
-
     private SSLEncryptionParameters sslEncryptionParameters;
     private KeyResourceLoader keyResourceLoader;
     private SecureCommsType secureCommsType;
@@ -117,13 +86,13 @@ public class HttpClientFactory
     private KeyStoreParameters keyStoreParameters;
     private MD5EncryptionParameters encryptionParameters;
 
-    private String host;
-    private int port;
-    private int sslPort;
+//    private String host;
+//    private int port;
+//    private int sslPort;
     
     private AlfrescoKeyStore sslKeyStore;
     private AlfrescoKeyStore sslTrustStore;
-    private ProtocolSocketFactory sslSocketFactory;
+    private LayeredConnectionSocketFactory sslSocketFactory;
 
     private int maxTotalConnections = 40;
 
@@ -147,9 +116,9 @@ public class HttpClientFactory
         this.keyResourceLoader = keyResourceLoader;
         this.keyStoreParameters = keyStoreParameters;
         this.encryptionParameters = encryptionParameters;
-        this.host = host;
-        this.port = port;
-        this.sslPort = sslPort;
+//        this.host = host;
+//        this.port = port;
+//        this.sslPort = sslPort;
         this.maxTotalConnections = maxTotalConnections;
         this.maxHostConnections = maxHostConnections;
         this.socketTimeout = socketTimeout;
@@ -162,24 +131,24 @@ public class HttpClientFactory
         this.sslTrustStore = new AlfrescoKeyStoreImpl(sslEncryptionParameters.getTrustStoreParameters(), keyResourceLoader);
         this.sslSocketFactory = new AuthSSLProtocolSocketFactory(sslKeyStore, sslTrustStore, keyResourceLoader);
         
-        // Setup the Apache httpclient library to use our concurrent HttpParams factory
-        DefaultHttpParams.setHttpParamsFactory(new NonBlockingHttpParamsFactory());
+//        // Setup the Apache httpclient library to use our concurrent HttpParams factory
+//        DefaultHttpParams.setHttpParamsFactory(new NonBlockingHttpParamsFactory());
     }
 
-    public void setHost(String host)
-    {
-        this.host = host;
-    }
-
-    public void setPort(int port)
-    {
-        this.port = port;
-    }
-
-    public void setSslPort(int sslPort)
-    {
-        this.sslPort = sslPort;
-    }
+//    public void setHost(String host)
+//    {
+//        this.host = host;
+//    }
+//
+//    public void setPort(int port)
+//    {
+//        this.port = port;
+//    }
+//
+//    public void setSslPort(int sslPort)
+//    {
+//        this.sslPort = sslPort;
+//    }
 
     public boolean isSSL()
     {
@@ -261,38 +230,47 @@ public class HttpClientFactory
         this.connectionTimeout = connectionTimeout;
     }
 
-    protected HttpClient constructHttpClient()
+    protected HttpClientBuilder getBaseHttpClientBuilder()
     {
+    	RequestConfig requestConfig = RequestConfig.custom()
+    		    .setSocketTimeout(socketTimeout)
+    		    .setConnectTimeout(connectionTimeout)
+    		    .setStaleConnectionCheckEnabled(true)
+    		    .build();
     	
-        MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-        HttpClient httpClient = new HttpClient(connectionManager);
-        HttpClientParams params = httpClient.getParams();
-        params.setBooleanParameter(HttpConnectionParams.TCP_NODELAY, true);
-        params.setBooleanParameter(HttpConnectionParams.STALE_CONNECTION_CHECK, true);
-        params.setSoTimeout(socketTimeout);
-        HttpConnectionManagerParams connectionManagerParams = httpClient.getHttpConnectionManager().getParams();
-        connectionManagerParams.setMaxTotalConnections(maxTotalConnections);
-        connectionManagerParams.setDefaultMaxConnectionsPerHost(maxHostConnections);
-        connectionManagerParams.setConnectionTimeout(connectionTimeout);
-
-        return httpClient;
+    	SocketConfig socketConfig = SocketConfig.custom()
+    			.setTcpNoDelay(true)
+    			.build();
+    	
+    	return HttpClientBuilder.create()
+    			.setRedirectStrategy(new LaxRedirectStrategy())
+    			.setMaxConnTotal(maxTotalConnections)
+    			.setMaxConnPerRoute(maxHostConnections)
+    			.setDefaultRequestConfig(requestConfig)
+    			.setDefaultSocketConfig(socketConfig);
+    	
+    			
     }
     
+    protected HttpClient constructHttpClient()
+    {    	
+    	return getBaseHttpClientBuilder().build();       
+    }
+    
+
     protected HttpClient getHttpsClient()
     {
-        // Configure a custom SSL socket factory that will enforce mutual authentication
-        HttpClient httpClient = constructHttpClient();
-        HttpHostFactory hostFactory = new HttpHostFactory(new Protocol("https", sslSocketFactory, sslPort));
-        httpClient.setHostConfiguration(new HostConfigurationWithHostFactory(hostFactory));
-        httpClient.getHostConfiguration().setHost(host, sslPort, "https");
-        return httpClient;
+    	
+    	HttpClientBuilder httpClientBuilder = getBaseHttpClientBuilder();
+    	
+    	httpClientBuilder.setSSLSocketFactory(sslSocketFactory);
+    	
+    	return httpClientBuilder.build();    	
     }
 
     protected HttpClient getDefaultHttpClient()
     {
-        HttpClient httpClient = constructHttpClient();
-        httpClient.getHostConfiguration().setHost(host, port);
-        return httpClient;
+        return getBaseHttpClientBuilder().build();
     }
     
     protected AlfrescoHttpClient getAlfrescoHttpsClient()
@@ -310,7 +288,6 @@ public class HttpClientFactory
     protected HttpClient getMD5HttpClient(String host, int port)
     {
         HttpClient httpClient = constructHttpClient();
-        httpClient.getHostConfiguration().setHost(host, port);
         return httpClient;
     }
     
@@ -393,7 +370,7 @@ public class HttpClientFactory
         /**
          * Send Request to the repository
          */
-        public Response sendRequest(Request req) throws AuthenticationException, IOException
+        public Response sendRequest(Request req) throws AuthenticationException, ProtocolException, IOException
         {
         	HttpResponse method = super.sendRemoteRequest(req);
             return new HttpMethodResponse(method);
@@ -415,7 +392,7 @@ public class HttpClientFactory
         /**
          * Send Request to the repository
          */
-        public Response sendRequest(Request req) throws AuthenticationException, IOException
+        public Response sendRequest(Request req) throws AuthenticationException, ProtocolException, IOException
         {
             HttpResponse method = super.sendRemoteRequest(req);
             return new HttpMethodResponse(method);
@@ -470,7 +447,12 @@ public class HttpClientFactory
                 Pair<byte[], AlgorithmParameters> encrypted = encryptor.encrypt(KeyProvider.ALIAS_SOLR, null, message);
                 encryptionUtils.setRequestAlgorithmParameters(method, encrypted.getSecond());
                 
-                ((HttpPost)method).getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, encrypted.getFirst().length > DEFAULT_SAVEPOST_BUFFER);
+            	RequestConfig requestConfig = RequestConfig.custom()
+            			.setExpectContinueEnabled(true)
+            			.build();
+            	
+            	((HttpPost)method).setConfig(requestConfig);
+            	
                 ByteArrayEntity requestEntity = new ByteArrayEntity(encrypted.getFirst(), ContentType.create("application/octet-stream"));
                 ((HttpPost)method).setEntity(requestEntity);
             }
@@ -480,7 +462,7 @@ public class HttpClientFactory
             return method;
         }
         
-        protected HttpResponse sendRemoteRequest(Request req) throws AuthenticationException, IOException
+        protected HttpResponse sendRemoteRequest(Request req) throws AuthenticationException, ProtocolException, IOException
         {
         	HttpResponse method = super.sendRemoteRequest(req);
 
@@ -496,29 +478,35 @@ public class HttpClientFactory
         /**
          * Send Request to the repository
          */
-        public Response sendRequest(Request req) throws AuthenticationException, IOException
+        public Response sendRequest(Request req) throws AuthenticationException, ProtocolException, IOException
         {
-        	HttpResponse method = super.sendRemoteRequest(req);
-            return new SecureHttpMethodResponse(method, httpClient.getHostConfiguration(), encryptionUtils);
+			try {
+				String host = (new URI(req.getFullUri())).getHost();
+	        	HttpResponse method = super.sendRemoteRequest(req);
+	            return new SecureHttpMethodResponse(method, host, encryptionUtils);
+			} catch (URISyntaxException e) {
+				throw new IOException("Unable to construct URI to extract host", e);
+			}
+
         }
     }
     
     static class SecureHttpMethodResponse extends HttpMethodResponse
     {
-        protected HostConfiguration hostConfig;
+        protected String hostAddress;
         protected EncryptionUtils encryptionUtils;
         // Need to get as a byte array because we need to read the request twice, once for authentication
         // and again by the web service.
         protected byte[] decryptedBody;
 
-        public SecureHttpMethodResponse(HttpResponse method, HostConfiguration hostConfig, 
+        public SecureHttpMethodResponse(HttpResponse method, String hostAddress, 
                 EncryptionUtils encryptionUtils) throws AuthenticationException, IOException
         {
             super(method);
-            this.hostConfig = hostConfig;
+            this.hostAddress = hostAddress;
             this.encryptionUtils = encryptionUtils;
 
-            if(method.getStatusCode() == HttpStatus.SC_OK)
+            if(method.getStatusLine().getStatusCode() == HttpStatus.SC_OK)
             {
                 this.decryptedBody = encryptionUtils.decryptResponseBody(method);
                 // authenticate the response
@@ -531,7 +519,7 @@ public class HttpClientFactory
         
         protected boolean authenticate() throws IOException
         {
-            return encryptionUtils.authenticateResponse(method, hostConfig.getHost(), decryptedBody);
+            return encryptionUtils.authenticateResponse(method, hostAddress, decryptedBody);
         }
         
         public InputStream getContentAsStream() throws IOException
@@ -547,66 +535,66 @@ public class HttpClientFactory
         }
     }
 
-    private static class HttpHostFactory
-    {
-        private Map<String, Protocol> protocols;
-
-        public HttpHostFactory(Protocol httpsProtocol)
-        {
-            protocols = new HashMap<String, Protocol>(2);
-            protocols.put("https", httpsProtocol);
-        }
- 
-        /** Get a host for the given parameters. This method need not be thread-safe. */
-        public HttpHost getHost(String host, int port, String scheme)
-        {
-            if(scheme == null)
-            {
-                scheme = "http";
-            }
-            Protocol protocol = protocols.get(scheme);
-            if(protocol == null)
-            {
-                protocol = Protocol.getProtocol("http");
-                if(protocol == null)
-                {
-                    throw new IllegalArgumentException("Unrecognised scheme parameter");
-                }
-            }
-
-            return new HttpHost(host, port, protocol);
-        }
-    }
-    
-    private static class HostConfigurationWithHostFactory extends HostConfiguration
-    {
-        private final HttpHostFactory factory;
-
-        public HostConfigurationWithHostFactory(HttpHostFactory factory)
-        {
-            this.factory = factory;
-        }
-
-        public synchronized void setHost(String host, int port, String scheme)
-        {
-            setHost(factory.getHost(host, port, scheme));
-        }
-
-        public synchronized void setHost(String host, int port)
-        {
-            setHost(factory.getHost(host, port, "http"));
-        }
-        
-        @SuppressWarnings("unused")
-        public synchronized void setHost(URI uri)
-        {
-            try {
-                setHost(uri.getHost(), uri.getPort(), uri.getScheme());
-            } catch(URIException e) {
-                throw new IllegalArgumentException(e.toString());
-            }
-        }
-    }
+//    private static class HttpHostFactory
+//    {
+//        private Map<String, Protocol> protocols;
+//
+//        public HttpHostFactory(Protocol httpsProtocol)
+//        {
+//            protocols = new HashMap<String, Protocol>(2);
+//            protocols.put("https", httpsProtocol);
+//        }
+// 
+//        /** Get a host for the given parameters. This method need not be thread-safe. */
+//        public HttpHost getHost(String host, int port, String scheme)
+//        {
+//            if(scheme == null)
+//            {
+//                scheme = "http";
+//            }
+//            Protocol protocol = protocols.get(scheme);
+//            if(protocol == null)
+//            {
+//                protocol = Protocol.getProtocol("http");
+//                if(protocol == null)
+//                {
+//                    throw new IllegalArgumentException("Unrecognised scheme parameter");
+//                }
+//            }
+//
+//            return new HttpHost(host, port, protocol);
+//        }
+//    }
+//    
+//    private static class HostConfigurationWithHostFactory extends HostConfiguration
+//    {
+//        private final HttpHostFactory factory;
+//
+//        public HostConfigurationWithHostFactory(HttpHostFactory factory)
+//        {
+//            this.factory = factory;
+//        }
+//
+//        public synchronized void setHost(String host, int port, String scheme)
+//        {
+//            setHost(factory.getHost(host, port, scheme));
+//        }
+//
+//        public synchronized void setHost(String host, int port)
+//        {
+//            setHost(factory.getHost(host, port, "http"));
+//        }
+//        
+//        @SuppressWarnings("unused")
+//        public synchronized void setHost(URI uri)
+//        {
+//            try {
+//                setHost(uri.getHost(), uri.getPort(), uri.getScheme());
+//            } catch(URIException e) {
+//                throw new IllegalArgumentException(e.toString());
+//            }
+//        }
+//    }
 
 //    /**
 //     * An extension of the DefaultHttpParamsFactory that uses a RRW lock pattern rather than

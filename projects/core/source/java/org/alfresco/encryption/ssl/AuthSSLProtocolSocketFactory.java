@@ -19,10 +19,8 @@
 package org.alfresco.encryption.ssl;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.security.KeyStore;
 
@@ -35,11 +33,10 @@ import javax.net.ssl.TrustManager;
 import org.alfresco.encryption.AlfrescoKeyStore;
 import org.alfresco.encryption.KeyResourceLoader;
 import org.alfresco.error.AlfrescoRuntimeException;
-import org.apache.commons.httpclient.ConnectTimeoutException;
-import org.apache.commons.httpclient.params.HttpConnectionParams;
-import org.apache.commons.httpclient.protocol.SecureProtocolSocketFactory;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpHost;
+import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.protocol.HttpContext;
 
 /**
  * <p>
@@ -74,11 +71,8 @@ import org.apache.commons.logging.LogFactory;
  * 
  * @since 4.0
  */
-public class AuthSSLProtocolSocketFactory implements SecureProtocolSocketFactory
+public class AuthSSLProtocolSocketFactory implements LayeredConnectionSocketFactory
 {
-	/** Log object for this class. */
-	private static final Log logger = LogFactory.getLog(AuthSSLProtocolSocketFactory.class);
-
 	private SSLContext sslcontext = null;
 
 	private AlfrescoKeyStore keyStore = null;
@@ -131,80 +125,120 @@ public class AuthSSLProtocolSocketFactory implements SecureProtocolSocketFactory
 		}
 	}
 
-	/**
-	 * Attempts to get a new socket connection to the given host within the given time limit.
-	 * <p>
-	 * To circumvent the limitations of older JREs that do not support connect timeout a 
-	 * controller thread is executed. The controller thread attempts to create a new socket 
-	 * within the given limit of time. If socket constructor does not return until the 
-	 * timeout expires, the controller terminates and throws an {@link ConnectTimeoutException}
-	 * </p>
-	 *  
-	 * @param host the host name/IP
-	 * @param port the port on the host
-	 * @param clientHost the local host name/IP to bind the socket to
-	 * @param clientPort the port on the local machine
-	 * @param params {@link HttpConnectionParams Http connection parameters}
-	 * 
-	 * @return Socket a new socket
-	 * 
-	 * @throws IOException if an I/O error occurs while creating the socket
-	 * @throws UnknownHostException if the IP address of the host cannot be
-	 * determined
-	 */
-	public Socket createSocket(final String host, final int port, final InetAddress localAddress, final int localPort,
-			final HttpConnectionParams params) throws IOException, UnknownHostException, ConnectTimeoutException
+//	/**
+//	 * Attempts to get a new socket connection to the given host within the given time limit.
+//	 * <p>
+//	 * To circumvent the limitations of older JREs that do not support connect timeout a 
+//	 * controller thread is executed. The controller thread attempts to create a new socket 
+//	 * within the given limit of time. If socket constructor does not return until the 
+//	 * timeout expires, the controller terminates and throws an {@link ConnectTimeoutException}
+//	 * </p>
+//	 *  
+//	 * @param host the host name/IP
+//	 * @param port the port on the host
+//	 * @param clientHost the local host name/IP to bind the socket to
+//	 * @param clientPort the port on the local machine
+//	 * @param params {@link HttpConnectionParams Http connection parameters}
+//	 * 
+//	 * @return Socket a new socket
+//	 * 
+//	 * @throws IOException if an I/O error occurs while creating the socket
+//	 * @throws UnknownHostException if the IP address of the host cannot be
+//	 * determined
+//	 */
+//	public Socket createSocket(final String host, final int port, final InetAddress localAddress, final int localPort,
+//			final HttpConnectionParams params) throws IOException, UnknownHostException, ConnectTimeoutException
+//	{
+//		SSLSocket sslSocket = null;
+//
+//		if(params == null)
+//		{
+//			throw new IllegalArgumentException("Parameters may not be null");
+//		}
+//		int timeout = params.getConnectionTimeout();
+//		SocketFactory socketfactory = getSSLContext().getSocketFactory();
+//		if(timeout == 0)
+//		{
+//			sslSocket = (SSLSocket)socketfactory.createSocket(host, port, localAddress, localPort);
+//		}
+//		else
+//		{
+//			sslSocket = (SSLSocket)socketfactory.createSocket();
+//			SocketAddress localaddr = new InetSocketAddress(localAddress, localPort);
+//			SocketAddress remoteaddr = new InetSocketAddress(host, port);
+//			sslSocket.bind(localaddr);
+//			sslSocket.connect(remoteaddr, timeout);
+//		}
+//
+//		return sslSocket;
+//	}
+
+//	/**
+//	 * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int,java.net.InetAddress,int)
+//	 */
+//	public Socket createSocket(String host, int port, InetAddress clientHost, int clientPort)
+//	throws IOException, UnknownHostException
+//	{
+//		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(host, port, clientHost, clientPort);
+//		return sslSocket;
+//	}
+//
+//	/**
+//	 * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int)
+//	 */
+//	public Socket createSocket(String host, int port) throws IOException, UnknownHostException
+//	{
+//		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(host, port);
+//		return sslSocket;
+//	}
+//
+//	/**
+//	 * @see SecureProtocolSocketFactory#createSocket(java.net.Socket,java.lang.String,int,boolean)
+//	 */
+//	public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
+//	throws IOException, UnknownHostException
+//	{
+//		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(socket, host, port, autoClose);
+//		return sslSocket;
+//	}
+
+	@Override
+	public Socket createSocket(HttpContext context) throws IOException
+	{		
+		SSLSocket sslSocket = (SSLSocket) getSSLContext().getSocketFactory().createSocket();
+		return sslSocket;
+	}
+
+	@Override
+	public Socket connectSocket(int connectTimeout, Socket sock, HttpHost host,
+			InetSocketAddress remoteAddress, InetSocketAddress localAddress,
+			HttpContext context) throws IOException
 	{
 		SSLSocket sslSocket = null;
 
-		if(params == null)
-		{
-			throw new IllegalArgumentException("Parameters may not be null");
-		}
-		int timeout = params.getConnectionTimeout();
 		SocketFactory socketfactory = getSSLContext().getSocketFactory();
-		if(timeout == 0)
+
+		sslSocket = (SSLSocket)socketfactory.createSocket();
+		sslSocket.bind(localAddress);
+		if(connectTimeout == 0) 
 		{
-			sslSocket = (SSLSocket)socketfactory.createSocket(host, port, localAddress, localPort);
+			sslSocket.connect(remoteAddress);
 		}
 		else
 		{
-			sslSocket = (SSLSocket)socketfactory.createSocket();
-			SocketAddress localaddr = new InetSocketAddress(localAddress, localPort);
-			SocketAddress remoteaddr = new InetSocketAddress(host, port);
-			sslSocket.bind(localaddr);
-			sslSocket.connect(remoteaddr, timeout);
+			sslSocket.connect(remoteAddress, connectTimeout);
 		}
-
+		
 		return sslSocket;
 	}
 
-	/**
-	 * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int,java.net.InetAddress,int)
-	 */
-	public Socket createSocket(String host, int port, InetAddress clientHost, int clientPort)
-	throws IOException, UnknownHostException
+	@Override
+	public Socket createLayeredSocket(Socket socket, String target, int port,
+			HttpContext context) throws IOException, UnknownHostException
 	{
-		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(host, port, clientHost, clientPort);
-		return sslSocket;
-	}
-
-	/**
-	 * @see SecureProtocolSocketFactory#createSocket(java.lang.String,int)
-	 */
-	public Socket createSocket(String host, int port) throws IOException, UnknownHostException
-	{
-		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(host, port);
-		return sslSocket;
-	}
-
-	/**
-	 * @see SecureProtocolSocketFactory#createSocket(java.net.Socket,java.lang.String,int,boolean)
-	 */
-	public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
-	throws IOException, UnknownHostException
-	{
-		SSLSocket sslSocket = (SSLSocket)getSSLContext().getSocketFactory().createSocket(socket, host, port, autoClose);
-		return sslSocket;
+		SSLConnectionSocketFactory connectionSocketFactory
+			= new SSLConnectionSocketFactory(getSSLContext());
+				
+		return connectionSocketFactory.createLayeredSocket(socket, target, port, context);
 	}
 }

@@ -26,6 +26,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolException;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.*;
 import org.apache.http.client.*;
 import org.apache.http.entity.ByteArrayEntity;
@@ -33,7 +34,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
-import org.apache.http.params.CoreProtocolPNames;
 
 public abstract class AbstractHttpClient implements AlfrescoHttpClient
 {
@@ -128,7 +128,11 @@ public abstract class AbstractHttpClient implements AlfrescoHttpClient
             ByteArrayEntity httpEntity = new ByteArrayEntity(req.getBody(), ContentType.create(req.getType()));
             if (req.getBody().length > DEFAULT_SAVEPOST_BUFFER)
             {
-                post.getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, true);
+            	RequestConfig requestConfig = RequestConfig.custom()
+            			.setExpectContinueEnabled(true)
+            			.build();
+            	
+            	post.setConfig(requestConfig);
             }
             post.setEntity(httpEntity);
             // Note: not able to automatically follow redirects for POST, this is handled by sendRemoteRequest

@@ -24,7 +24,7 @@ import java.security.AlgorithmParameters;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.httpclient.HttpMethod;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
 
 /**
@@ -41,7 +41,7 @@ public interface EncryptionUtils
      * @return decrypted response body
      * @throws IOException
      */
-    public byte[] decryptResponseBody(HttpMethod method) throws IOException;
+    public byte[] decryptResponseBody(HttpResponse method) throws IOException;
 
     /**
      * Decrypt the body of the http request
@@ -61,7 +61,7 @@ public interface EncryptionUtils
      * @param decryptedBody
      * @return true if the method reponse is authentic, false otherwise
      */
-    public boolean authenticateResponse(HttpMethod method, String remoteIP, byte[] decryptedBody);
+    public boolean authenticateResponse(HttpResponse method, String remoteIP, byte[] decryptedBody);
 
     /**
      * Authenticate the http request: validate the MAC, check that the remote IP is

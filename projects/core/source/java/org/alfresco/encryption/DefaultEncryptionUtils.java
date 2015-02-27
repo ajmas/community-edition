@@ -32,12 +32,14 @@ import javax.servlet.http.HttpServletResponse;
 import org.alfresco.encryption.MACUtils.MACInput;
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.util.IPUtils;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.util.EntityUtils;
 import org.springframework.extensions.surf.util.Base64;
 import org.springframework.util.FileCopyUtils;
 
@@ -167,9 +169,9 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * @return the MAC
      * @throws IOException
      */
-	protected byte[] getResponseMac(HttpMethod res) throws IOException
+	protected byte[] getResponseMac(HttpResponse res) throws IOException
     {
-    	Header header = res.getResponseHeader(HEADER_MAC);
+    	Header header = res.getFirstHeader(HEADER_MAC);
     	if(header != null)
     	{
     		return Base64.decode(header.getValue());
@@ -207,9 +209,9 @@ public class DefaultEncryptionUtils implements EncryptionUtils
 	 * @return timestamp (ms, in UNIX time)
 	 * @throws IOException
 	 */
-    protected Long getResponseTimestamp(HttpMethod method) throws IOException
+    protected Long getResponseTimestamp(HttpResponse method) throws IOException
     {
-    	Header header = method.getResponseHeader(HEADER_TIMESTAMP);
+    	Header header = method.getFirstHeader(HEADER_TIMESTAMP);
     	if(header != null)
     	{
     		return Long.valueOf(header.getValue());
@@ -274,9 +276,9 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * @return decoded algorithm parameters
      * @throws IOException
      */
-    protected AlgorithmParameters decodeAlgorithmParameters(HttpMethod method) throws IOException
+    protected AlgorithmParameters decodeAlgorithmParameters(HttpResponse method) throws IOException
     {
-    	Header header = method.getResponseHeader(HEADER_ALGORITHM_PARAMETERS);
+    	Header header = method.getFirstHeader(HEADER_ALGORITHM_PARAMETERS);
     	if(header != null)
     	{
     		byte[] algorithmParams = Base64.decode(header.getValue());
@@ -315,29 +317,41 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * {@inheritDoc}
      */
     @Override
-    public byte[] decryptResponseBody(HttpMethod method) throws IOException
+    public byte[] decryptResponseBody(HttpResponse method) throws IOException
     {
-        // TODO fileoutputstream if content is especially large?
-    	InputStream body = method.getResponseBodyAsStream();
-    	if(body != null)
+    	HttpEntity responseEntity = null;
+    	try
     	{
-        	ByteArrayOutputStream out = new ByteArrayOutputStream();
-        	FileCopyUtils.copy(body, out);
-
-    		AlgorithmParameters params = decodeAlgorithmParameters(method);
-    		if(params != null)
-    		{
-	            byte[] decrypted = encryptor.decrypt(KeyProvider.ALIAS_SOLR, params, out.toByteArray());
-	            return decrypted;
-    		}
-    		else
-    		{
-    			throw new AlfrescoRuntimeException("Unable to decrypt response body, missing encryption algorithm parameters");
-    		}
+    		responseEntity = method.getEntity();
+	        // TODO fileoutputstream if content is especially large?
+	    	InputStream body = responseEntity.getContent();
+	    	if(body != null)
+	    	{
+	    		responseEntity = method.getEntity();
+	        	ByteArrayOutputStream out = new ByteArrayOutputStream();
+	        	FileCopyUtils.copy(body, out);
+	
+	    		AlgorithmParameters params = decodeAlgorithmParameters(method);
+	    		if(params != null)
+	    		{
+		            byte[] decrypted = encryptor.decrypt(KeyProvider.ALIAS_SOLR, params, out.toByteArray());
+		            return decrypted;
+	    		}
+	    		else
+	    		{
+	    			throw new AlfrescoRuntimeException("Unable to decrypt response body, missing encryption algorithm parameters");
+	    		}
+	    	}
+	    	else
+	    	{
+	    		return null;
+	    	}
     	}
-    	else
+    	finally
     	{
-    		return null;
+    		if (responseEntity != null) {
+    			EntityUtils.consume(responseEntity);
+    		}
     	}
     }
     
@@ -374,7 +388,7 @@ public class DefaultEncryptionUtils implements EncryptionUtils
      * {@inheritDoc}
      */
     @Override
-    public boolean authenticateResponse(HttpMethod method, String remoteIP, byte[] decryptedBody)
+    public boolean authenticateResponse(HttpResponse method, String remoteIP, byte[] decryptedBody)
     {
     	try
     	{
