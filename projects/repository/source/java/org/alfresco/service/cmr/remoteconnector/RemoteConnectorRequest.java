@@ -20,8 +20,10 @@ package org.alfresco.service.cmr.remoteconnector;
 
 import java.io.InputStream;
 
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.methods.RequestEntity;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+
+
 
 /**
  * Helper wrapper around a Remote Request, to be performed by the
@@ -61,7 +63,7 @@ public interface RemoteConnectorRequest
     void setRequestBody(String body);
     void setRequestBody(byte[] body);
     void setRequestBody(InputStream body);
-    void setRequestBody(RequestEntity body);
+    void setRequestBody(HttpEntity body);
     
     Header[] getRequestHeaders();
     void addRequestHeader(String name, String value);

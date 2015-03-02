@@ -49,6 +49,7 @@ import org.alfresco.solr.InformationServer;
 import org.alfresco.solr.client.AlfrescoModel;
 import org.alfresco.solr.client.AlfrescoModelDiff;
 import org.alfresco.solr.client.SOLRAPIClient;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 
 public class ModelTracker extends AbstractTracker implements Tracker
@@ -153,7 +154,7 @@ public class ModelTracker extends AbstractTracker implements Tracker
     }
 
     @Override
-    protected void doTrack() throws AuthenticationException, IOException, JSONException
+    protected void doTrack() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         // Is the InformationServer ready to update
         int registeredSearcherCount = this.infoSrv.getRegisteredSearcherCount();
@@ -167,7 +168,7 @@ public class ModelTracker extends AbstractTracker implements Tracker
         trackModels(false);
     }
 
-    public void trackModels(boolean onlyFirstTime) throws AuthenticationException, IOException, JSONException
+    public void trackModels(boolean onlyFirstTime) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresWriteLock = false;
         modelLock.readLock().lock();
@@ -238,7 +239,7 @@ public class ModelTracker extends AbstractTracker implements Tracker
      * @throws IOException
      * @throws JSONException
      */
-    private void trackModelsImpl() throws AuthenticationException, IOException, JSONException
+    private void trackModelsImpl() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long start = System.nanoTime();
 

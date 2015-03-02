@@ -75,6 +75,7 @@ import org.alfresco.solr.client.SOLRAPIClient.GetTextContentResponse;
 import org.alfresco.solr.client.Transaction;
 import org.alfresco.solr.client.Transactions;
 import org.alfresco.util.NumericEncoder;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.quartz.CronTrigger;
 import org.quartz.JobDataMap;
@@ -427,7 +428,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void indexAclChangeSets() throws AuthenticationException, IOException, JSONException
+    private void indexAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclChangeSetsToIndex.peek() != null)
@@ -458,7 +459,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void indexAcls() throws AuthenticationException, IOException, JSONException
+    private void indexAcls() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclsToIndex.peek() != null)
@@ -480,7 +481,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void reindexAclChangeSets() throws AuthenticationException, IOException, JSONException
+    private void reindexAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclChangeSetsToReindex.peek() != null)
@@ -514,7 +515,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void reindexAcls() throws AuthenticationException, IOException, JSONException
+    private void reindexAcls() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclsToReindex.peek() != null)
@@ -666,7 +667,7 @@ public class CoreTracker implements Tracker
         aclsToPurge.offer(aclToPurge);
     }
 
-    private void reindexTransactions() throws IOException, AuthenticationException, JSONException
+    private void reindexTransactions() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         int docCount = 0;
         boolean requiresCommit = false;
@@ -783,7 +784,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void indexTransactions() throws IOException, AuthenticationException, JSONException
+    private void indexTransactions() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         int docCount = 0;
         boolean requiresCommit = false;
@@ -883,7 +884,7 @@ public class CoreTracker implements Tracker
     }
 
 
-    private void trackRepository() throws IOException, AuthenticationException, JSONException
+    private void trackRepository() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         // Is the InformationServer ready to update
         int registeredSearcherCount = this.infoSrv.getRegisteredSearcherCount();
@@ -927,7 +928,7 @@ public class CoreTracker implements Tracker
      * @throws IOException
      * @throws JSONException
      */
-    protected void trackTransactions() throws AuthenticationException, IOException, JSONException
+    protected void trackTransactions() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean indexed = false;
         boolean upToDate = false;
@@ -1052,7 +1053,7 @@ public class CoreTracker implements Tracker
      * @throws IOException
      * @throws JSONException
      */
-    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException
+    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean aclIndexing = false;
         AclChangeSets aclChangeSets;
@@ -1145,7 +1146,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException
+    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         if(state.getLastGoodTxCommitTimeInIndex() == 0) 
         {
@@ -1249,7 +1250,7 @@ public class CoreTracker implements Tracker
         }
     }
 
-    protected AclChangeSets getSomeAclChangeSets(BoundedDeque<AclChangeSet> changeSetsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException
+    protected AclChangeSets getSomeAclChangeSets(BoundedDeque<AclChangeSet> changeSetsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long actualTimeStep  = timeStep;
 
@@ -1300,7 +1301,7 @@ public class CoreTracker implements Tracker
     }
 
 
-    protected Transactions getSomeTransactions(BoundedDeque<Transaction> txnsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException
+    protected Transactions getSomeTransactions(BoundedDeque<Transaction> txnsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long actualTimeStep  = timeStep;
 
@@ -1355,7 +1356,7 @@ public class CoreTracker implements Tracker
      * @throws IOException
      * @throws JSONException
      */
-    private void trackModelsImpl() throws AuthenticationException, IOException, JSONException
+    private void trackModelsImpl() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         // track models
         // reflect changes changes and update on disk copy
@@ -1663,7 +1664,7 @@ public class CoreTracker implements Tracker
     }
 
     public IndexHealthReport checkIndex(Long fromTx, Long toTx, Long fromAclTx, Long toAclTx, Long fromTime, Long toTime) 
-                throws AuthenticationException, IOException, JSONException
+                throws AuthenticationException, IOException, JSONException, ProtocolException
     {
 
         IndexHealthReport indexHealthReport = new IndexHealthReport(infoSrv);
@@ -1855,6 +1856,10 @@ public class CoreTracker implements Tracker
             nodeReport.setDbNodeStatus(SolrApiNodeStatus.UNKNOWN);
             nodeReport.setDbTx(-4l);
         }
+        catch (ProtocolException e)
+        {
+            nodeReport.setDbNodeStatus(SolrApiNodeStatus.UNKNOWN);
+            nodeReport.setDbTx(-5l);        }          
 
         this.infoSrv.checkNodeCommon(nodeReport);
 
@@ -1886,6 +1891,10 @@ public class CoreTracker implements Tracker
         {
             throw new AlfrescoRuntimeException("Failed to get nodes", e);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get nodes", e);
+        }        
     }
 
 
@@ -1920,6 +1929,10 @@ public class CoreTracker implements Tracker
         {
             throw new AlfrescoRuntimeException("Failed to get acls", e);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get acls", e);
+        }        
     }
 
     @Override
@@ -1947,6 +1960,10 @@ public class CoreTracker implements Tracker
         {
             aclReport.setExistsInDb(false);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get acls", e);
+        }        
 
         // In Index
         return this.infoSrv.checkAclInIndex(aclid, aclReport);
@@ -1989,7 +2006,7 @@ public class CoreTracker implements Tracker
     }
 
     @Override
-    public void trackModels(boolean onlyFirstTime)  throws AuthenticationException, IOException, JSONException
+    public void trackModels(boolean onlyFirstTime)  throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresWriteLock = false;
         modelLock.readLock().lock();
@@ -2073,13 +2090,13 @@ public class CoreTracker implements Tracker
     }
     
     @Override
-    public List<NodeMetaData> getNodesMetaData(NodeMetaDataParameters params, int maxResults) throws AuthenticationException, IOException, JSONException 
+    public List<NodeMetaData> getNodesMetaData(NodeMetaDataParameters params, int maxResults) throws AuthenticationException, IOException, JSONException, ProtocolException 
     {
         return client.getNodesMetaData(params, maxResults);
     }
     
     @Override
-    public GetTextContentResponse getTextContent(Long nodeId, QName propertyQName, Long modifiedSince) throws AuthenticationException, IOException
+    public GetTextContentResponse getTextContent(Long nodeId, QName propertyQName, Long modifiedSince) throws AuthenticationException, IOException, ProtocolException
     {
         return client.getTextContent(nodeId, propertyQName, modifiedSince);
     }

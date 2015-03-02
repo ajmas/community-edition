@@ -47,6 +47,7 @@ import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.socket.LayeredConnectionSocketFactory;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.LaxRedirectStrategy;
 
@@ -116,9 +117,6 @@ public class HttpClientFactory
         this.keyResourceLoader = keyResourceLoader;
         this.keyStoreParameters = keyStoreParameters;
         this.encryptionParameters = encryptionParameters;
-//        this.host = host;
-//        this.port = port;
-//        this.sslPort = sslPort;
         this.maxTotalConnections = maxTotalConnections;
         this.maxHostConnections = maxHostConnections;
         this.socketTimeout = socketTimeout;
@@ -129,26 +127,8 @@ public class HttpClientFactory
     {
         this.sslKeyStore = new AlfrescoKeyStoreImpl(sslEncryptionParameters.getKeyStoreParameters(),  keyResourceLoader);
         this.sslTrustStore = new AlfrescoKeyStoreImpl(sslEncryptionParameters.getTrustStoreParameters(), keyResourceLoader);
-        this.sslSocketFactory = new AuthSSLProtocolSocketFactory(sslKeyStore, sslTrustStore, keyResourceLoader);
-        
-//        // Setup the Apache httpclient library to use our concurrent HttpParams factory
-//        DefaultHttpParams.setHttpParamsFactory(new NonBlockingHttpParamsFactory());
+        this.sslSocketFactory = new AuthSSLProtocolSocketFactory(sslKeyStore, sslTrustStore, keyResourceLoader);       
     }
-
-//    public void setHost(String host)
-//    {
-//        this.host = host;
-//    }
-//
-//    public void setPort(int port)
-//    {
-//        this.port = port;
-//    }
-//
-//    public void setSslPort(int sslPort)
-//    {
-//        this.sslPort = sslPort;
-//    }
 
     public boolean isSSL()
     {
@@ -236,6 +216,7 @@ public class HttpClientFactory
     		    .setSocketTimeout(socketTimeout)
     		    .setConnectTimeout(connectionTimeout)
     		    .setStaleConnectionCheckEnabled(true)
+    		    .setRedirectsEnabled(true)
     		    .build();
     	
     	SocketConfig socketConfig = SocketConfig.custom()
@@ -262,7 +243,7 @@ public class HttpClientFactory
     }
     
 
-    protected HttpClient getHttpsClient()
+    protected CloseableHttpClient getHttpsClient()
     {
     	
     	HttpClientBuilder httpClientBuilder = getBaseHttpClientBuilder();
@@ -272,7 +253,7 @@ public class HttpClientFactory
     	return httpClientBuilder.build();    	
     }
 
-    protected HttpClient getDefaultHttpClient()
+    protected CloseableHttpClient getDefaultHttpClient()
     {
         return getBaseHttpClientBuilder().build();
     }
@@ -336,9 +317,9 @@ public class HttpClientFactory
         return repoClient;
     }
     
-    public HttpClient getHttpClient()
+    public CloseableHttpClient getHttpClient()
     {
-        HttpClient httpClient = null;
+    	CloseableHttpClient httpClient = null;
 
         if(secureCommsType == SecureCommsType.HTTPS)
         {
@@ -618,7 +599,7 @@ public class HttpClientFactory
 //            }
 //        }
 //    }
-
+//
 //    /**
 //     * An extension of the DefaultHttpParamsFactory that uses a RRW lock pattern rather than
 //     * full synchronization around the parameter CRUD - to avoid locking on many reads. 
@@ -749,7 +730,7 @@ public class HttpClientFactory
 //            return params;
 //        }
 //    }
-    
+//    
 //    /**
 //     * @author Kevin Roast
 //     */

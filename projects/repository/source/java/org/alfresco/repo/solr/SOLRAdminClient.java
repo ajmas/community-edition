@@ -18,7 +18,6 @@
  */
 package org.alfresco.repo.solr;
 
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -30,12 +29,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.httpclient.HttpClientFactory;
 import org.alfresco.util.ParameterCheck;
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.CommonsHttpSolrServer;
 import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.params.ModifiableSolrParams;
@@ -49,6 +49,8 @@ import org.quartz.Trigger;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
+
+import org.apache.solr.client.solrj.impl.HttpSolrServer;
 
 /**
  * Provides an interface to the Solr admin APIs, used by the Alfresco Enterprise JMX layer.
@@ -67,7 +69,7 @@ public class SOLRAdminClient implements ApplicationEventPublisherAware, Disposab
 	private String solrPassword;
 	private String solrPingCronExpression;
 	private String baseUrl;
-	private CommonsHttpSolrServer server;
+	private HttpSolrServer server;
 	private int solrConnectTimeout = 30000; // ms
 
 	private ApplicationEventPublisher applicationEventPublisher;
@@ -148,32 +150,28 @@ public class SOLRAdminClient implements ApplicationEventPublisherAware, Disposab
     	ParameterCheck.mandatory("solrPingCronExpression", solrPingCronExpression);
     	ParameterCheck.mandatory("solrConnectTimeout", solrConnectTimeout);
 
-		try
-		{
-	    	StringBuilder sb = new StringBuilder();
-	    	sb.append(httpClientFactory.isSSL() ? "https://" : "http://");
-	    	sb.append(solrHost);
-	    	sb.append(":");
-	    	sb.append(httpClientFactory.isSSL() ? solrSSLPort: solrPort);
-	    	sb.append(baseUrl);
-			this.solrUrl = sb.toString();
-			HttpClient httpClient = httpClientFactory.getHttpClient();
+    	StringBuilder sb = new StringBuilder();
+    	sb.append(httpClientFactory.isSSL() ? "https://" : "http://");
+    	sb.append(solrHost);
+    	sb.append(":");
+    	sb.append(httpClientFactory.isSSL() ? solrSSLPort: solrPort);
+    	sb.append(baseUrl);
+		this.solrUrl = sb.toString();
+		
+    	HttpClientBuilder httpClientBuilder = httpClientFactory.getHttpClientBuilder();
+    	
+		// TODO remove credentials because we're using SSL?
+    	CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    	credentialsProvider.setCredentials(new AuthScope(solrHost, solrPort, AuthScope.ANY_REALM), 
+    			new UsernamePasswordCredentials(solrUser, solrPassword));
+    	httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+    	
+		server = new HttpSolrServer(solrUrl, (CloseableHttpClient) (httpClientBuilder.build()));
+		server.setParser(new XMLResponseParser());
+		server.setConnectionTimeout(solrConnectTimeout);
+		server.setSoTimeout(20000);
 
-			server = new CommonsHttpSolrServer(solrUrl, httpClient);
-			server.setParser(new XMLResponseParser());
-			// TODO remove credentials because we're using SSL?
-			Credentials defaultcreds = new UsernamePasswordCredentials(solrUser, solrPassword); 
-			server.getHttpClient().getState().setCredentials(new AuthScope(solrHost, solrPort, AuthScope.ANY_REALM), 
-					defaultcreds);
-			server.setConnectionTimeout(solrConnectTimeout);
-			server.setSoTimeout(20000);
-
-			this.solrTracker = new SolrTracker(scheduler);
-		}
-		catch(MalformedURLException e)
-		{
-			throw new AlfrescoRuntimeException("Cannot initialise Solr admin http client", e);
-		}
+		this.solrTracker = new SolrTracker(scheduler);
 	}
 
 	public QueryResponse basicQuery(ModifiableSolrParams params)

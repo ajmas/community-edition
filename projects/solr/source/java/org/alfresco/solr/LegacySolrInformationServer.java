@@ -92,6 +92,7 @@ import org.alfresco.util.ISO9075;
 import org.alfresco.util.NumericEncoder;
 import org.alfresco.util.Pair;
 import org.alfresco.util.TempFileProvider;
+import org.apache.http.ProtocolException;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Fieldable;
@@ -1078,7 +1079,7 @@ public class LegacySolrInformationServer implements CloseHook, InformationServer
 
     private void updateDescendantAuxDocs(NodeMetaData parentNodeMetaData, boolean overwrite,
                 SolrIndexSearcher solrIndexSearcher, LinkedHashSet<Long> stack, DocSet skippingDocs) throws AuthenticationException,
-                IOException, JSONException
+                IOException, JSONException, ProtocolException
     {
         if (stack.contains(parentNodeMetaData.getId()))
         {
@@ -1104,7 +1105,7 @@ public class LegacySolrInformationServer implements CloseHook, InformationServer
 
     private void doUpdateDescendantAuxDocs(NodeMetaData parentNodeMetaData, boolean overwrite,
                 SolrIndexSearcher solrIndexSearcher, LinkedHashSet<Long> stack, DocSet skippingDocs) throws AuthenticationException,
-                IOException, JSONException
+                IOException, JSONException, ProtocolException
     {
         if (skipDescendantAuxDocsForSpecificTypes && typesForSkippingDescendantAuxDocs.contains(parentNodeMetaData.getType()))
         {
@@ -1876,7 +1877,7 @@ public class LegacySolrInformationServer implements CloseHook, InformationServer
 
     private void addContentPropertyToDoc(SolrInputDocument doc, ArrayList<Reader> toClose, ArrayList<File> toDelete,
                 NodeMetaData nodeMetaData, QName propertyQName, ContentPropertyValue contentPropertyValue, boolean indexContent)
-                throws AuthenticationException, IOException
+                throws AuthenticationException, IOException, ProtocolException
     {
         if (!coreTracker.canAddContentPropertyToDoc()) { return; }
 

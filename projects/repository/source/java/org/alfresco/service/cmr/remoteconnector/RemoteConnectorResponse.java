@@ -21,7 +21,7 @@ package org.alfresco.service.cmr.remoteconnector;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.apache.commons.httpclient.Header;
+import org.apache.http.Header;
 import org.springframework.extensions.webscripts.Status;
 
 /**

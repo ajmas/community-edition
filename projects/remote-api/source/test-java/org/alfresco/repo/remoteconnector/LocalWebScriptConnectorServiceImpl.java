@@ -40,10 +40,12 @@ import org.alfresco.repo.web.scripts.BaseWebScriptTest;
 import org.alfresco.repo.web.scripts.servlet.BasicHttpAuthenticatorFactory;
 import org.alfresco.repo.web.scripts.servlet.LocalTestRunAsAuthenticatorFactory.LocalTestRunAsAuthenticator;
 import org.alfresco.repo.web.scripts.servlet.BasicHttpAuthenticatorFactory.BasicHttpAuthenticator;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpMethodBase;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.Header;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 import org.springframework.extensions.webscripts.Authenticator;
@@ -116,14 +118,14 @@ public class LocalWebScriptConnectorServiceImpl implements RemoteConnectorServic
     /**
      * Builds a new Request object, using HttpClient method descriptions
      */
-    public RemoteConnectorRequest buildRequest(String url, Class<? extends HttpMethodBase> method)
+    public RemoteConnectorRequest buildRequest(String url, Class<? extends HttpRequestBase> method)
     {
         // Get the method name
         String methodName;
         try
         {
-            HttpMethodBase httpMethod = method.getConstructor(String.class).newInstance(url);
-            methodName = httpMethod.getName();
+            HttpRequestBase httpMethod = method.getConstructor(String.class).newInstance(url);
+            methodName = httpMethod.getMethod();
         }
         catch(Exception e)
         {
@@ -148,8 +150,10 @@ public class LocalWebScriptConnectorServiceImpl implements RemoteConnectorServic
         if (request.getRequestBody() != null)
         {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            requestImpl.getRequestBody().writeRequest(baos);
+            
+            IOUtils.copy(requestImpl.getRequestBody().getContent(), baos);
             req.setBody(baos.toByteArray());
+            EntityUtils.consumeQuietly(requestImpl.getRequestBody());
         }
         
         // Log

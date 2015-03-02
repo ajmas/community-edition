@@ -40,6 +40,7 @@ import org.alfresco.solr.client.Node.SolrApiNodeStatus;
 import org.alfresco.solr.client.SOLRAPIClient;
 import org.alfresco.solr.client.Transaction;
 import org.alfresco.solr.client.Transactions;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +80,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
     }
 
     @Override
-    protected void doTrack() throws AuthenticationException, IOException, JSONException
+    protected void doTrack() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         // MetadataTracker must wait until ModelTracker has run
         ModelTracker modelTracker = this.infoSrv.getAdminHandler().getTrackerRegistry().getModelTracker();
@@ -99,7 +100,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
     }
 
 
-    private void trackRepository() throws IOException, AuthenticationException, JSONException
+    private void trackRepository() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         // Is the InformationServer ready to update
         int registeredSearcherCount = this.infoSrv.getRegisteredSearcherCount();
@@ -131,8 +132,9 @@ public class MetadataTracker extends AbstractTracker implements Tracker
      * @throws AuthenticationException
      * @throws IOException
      * @throws JSONException
+     * @throws ProtocolException 
      */
-    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException
+    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         Transactions firstTransactions = null;
         if (state.getLastGoodTxCommitTimeInIndex() == 0) 
@@ -215,7 +217,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
         }
     }
     
-    private void indexTransactions() throws IOException, AuthenticationException, JSONException
+    private void indexTransactions() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         long startElapsed = System.nanoTime();
         
@@ -306,7 +308,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
         }
     }
 
-    private void reindexTransactions() throws IOException, AuthenticationException, JSONException
+    private void reindexTransactions() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         long startElapsed = System.nanoTime();
         int docCount = 0;
@@ -478,7 +480,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
     }
 
     protected Transactions getSomeTransactions(BoundedDeque<Transaction> txnsFound, Long fromCommitTime, long timeStep,
-                int maxResults, long endTime) throws AuthenticationException, IOException, JSONException
+                int maxResults, long endTime) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long actualTimeStep = timeStep;
 
@@ -501,7 +503,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
         return transactions;
     }
 
-    protected void trackTransactions() throws AuthenticationException, IOException, JSONException
+    protected void trackTransactions() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long startElapsed = System.nanoTime();
         
@@ -660,7 +662,7 @@ public class MetadataTracker extends AbstractTracker implements Tracker
         return count;
     }
 
-    private int indexBatchOfTransactions(List<Transaction> txBatch) throws AuthenticationException, IOException, JSONException
+    private int indexBatchOfTransactions(List<Transaction> txBatch) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         int nodeCount = 0;
         ArrayList<Transaction> nonEmptyTxs = new ArrayList<>(txBatch.size());
@@ -768,6 +770,11 @@ public class MetadataTracker extends AbstractTracker implements Tracker
             nodeReport.setDbNodeStatus(SolrApiNodeStatus.UNKNOWN);
             nodeReport.setDbTx(-4l);
         }
+        catch (ProtocolException e1)
+        {
+            nodeReport.setDbNodeStatus(SolrApiNodeStatus.UNKNOWN);
+            nodeReport.setDbTx(-5l);
+        }        
         
         this.infoSrv.addCommonNodeReportInfo(nodeReport);
 
@@ -811,10 +818,14 @@ public class MetadataTracker extends AbstractTracker implements Tracker
         {
             throw new AlfrescoRuntimeException("Failed to get nodes", e);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get nodes", e);
+        }        
     }
 
     public IndexHealthReport checkIndex(Long toTx, Long toAclTx, Long fromTime, Long toTime)
-                throws IOException, AuthenticationException, JSONException
+                throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         // DB TX Count
         long firstTransactionCommitTime = 0;

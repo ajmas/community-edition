@@ -64,24 +64,26 @@ import org.alfresco.repo.dictionary.DictionaryComponent;
 import org.alfresco.repo.dictionary.DictionaryDAOImpl;
 import org.alfresco.repo.dictionary.CompiledModelsCache;
 import org.alfresco.repo.dictionary.DictionaryNamespaceComponent;
-import org.alfresco.repo.dictionary.DictionaryRegistry;
 import org.alfresco.repo.dictionary.M2Model;
 import org.alfresco.repo.dictionary.M2Namespace;
 import org.alfresco.repo.dictionary.NamespaceDAO;
 import org.alfresco.repo.i18n.StaticMessageLookup;
 import org.alfresco.repo.tenant.SingleTServiceImpl;
 import org.alfresco.repo.tenant.TenantService;
+import org.alfresco.service.namespace.InvalidQNameException;
 import org.alfresco.service.namespace.QName;
 import org.alfresco.util.DynamicallySizedThreadPoolExecutor;
 import org.alfresco.util.Pair;
 import org.alfresco.util.TraceableThreadFactory;
 import org.alfresco.util.cache.DefaultAsynchronouslyRefreshedCacheRegistry;
 import org.apache.chemistry.opencmis.commons.enums.CmisVersion;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.ProtocolException;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.ContentType;
 import org.json.JSONException;
 
 /**
@@ -201,7 +203,7 @@ public class SOLRAPIClientTest extends TestCase
         }
     }
 
-    private void trackModels() throws AuthenticationException, IOException, JSONException
+    private void trackModels() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
 
         List<AlfrescoModelDiff> modelDiffs = client.getModelsDiff(Collections.<AlfrescoModel> emptyList());
@@ -463,7 +465,7 @@ public class SOLRAPIClientTest extends TestCase
         }
     }
 
-    public void testMetaData() throws AuthenticationException, IOException, JSONException
+    public void testMetaData() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         NodeMetaDataParameters metaParams = new NodeMetaDataParameters();
         List<Long> nodeIds = new ArrayList<Long>(1);
@@ -549,7 +551,7 @@ public class SOLRAPIClientTest extends TestCase
         }
     }
 
-    public void testGetModel() throws AuthenticationException, IOException, JSONException
+    public void testGetModel() throws AuthenticationException, IOException, JSONException, InvalidQNameException, ProtocolException
     {
         AlfrescoModel alfModel = client.getModel(QName.createQName("http://www.alfresco.org/model/content/1.0", "contentmodel"));
         M2Model model = alfModel.getModel();
@@ -558,7 +560,7 @@ public class SOLRAPIClientTest extends TestCase
         assertNotNull(alfModel.getChecksum());
     }
 
-    public void testGetModelDiffs() throws AuthenticationException, IOException, JSONException
+    public void testGetModelDiffs() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         List<AlfrescoModelDiff> diffs = client.getModelsDiff(Collections.<AlfrescoModel> emptyList());
         assertTrue(diffs.size() > 0);
@@ -642,15 +644,15 @@ public class SOLRAPIClientTest extends TestCase
         }
 
         @Override
-        public void setRequestAuthentication(HttpMethod method, byte[] message) throws IOException
+        public void setRequestAuthentication(HttpUriRequest method, byte[] message) throws IOException
         {
-            if (method instanceof PostMethod)
+            if (method instanceof HttpPost)
             {
                 // encrypt body
                 Pair<byte[], AlgorithmParameters> encrypted = encryptor.encrypt(KeyProvider.ALIAS_SOLR, null, message);
                 setRequestAlgorithmParameters(method, encrypted.getSecond());
 
-                ((PostMethod) method).setRequestEntity(new ByteArrayRequestEntity(encrypted.getFirst(), "application/octet-stream"));
+                ((HttpPost) method).setEntity(new ByteArrayEntity(encrypted.getFirst(), ContentType.APPLICATION_OCTET_STREAM));
             }
 
             long requestTimestamp = System.currentTimeMillis();
@@ -660,8 +662,8 @@ public class SOLRAPIClientTest extends TestCase
 
             if (logger.isDebugEnabled())
             {
-                logger.debug("Setting MAC " + mac + " on HTTP request " + method.getPath());
-                logger.debug("Setting timestamp " + requestTimestamp + " on HTTP request " + method.getPath());
+                logger.debug("Setting MAC " + mac + " on HTTP request " + method.getURI().getPath());
+                logger.debug("Setting timestamp " + requestTimestamp + " on HTTP request " + method.getURI().getPath());
             }
 
             if (overrideMAC)

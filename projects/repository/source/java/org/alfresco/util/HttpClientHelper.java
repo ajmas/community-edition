@@ -19,9 +19,10 @@
 package org.alfresco.util;
 
 import org.alfresco.httpclient.HttpClientFactory;
-import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.client.HttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.springframework.extensions.webscripts.connector.RemoteClient;
 
 /**
@@ -39,13 +40,17 @@ public class HttpClientHelper
     private static Log logger = LogFactory.getLog(HttpClientHelper.class);
             
     // HTTP Client instance - per thread
-    private static ThreadLocal<HttpClient> httpClient = new ThreadLocal<HttpClient>()
+    private static ThreadLocal<CloseableHttpClient> httpClient = new ThreadLocal<CloseableHttpClient>()
     {
         @Override
-        protected HttpClient initialValue()
+        protected CloseableHttpClient initialValue()
         {
+        	// TODO we are no longer used the code from HttpClientFactory.NonBlockingHttpParams()
+        	//      investigate what the appropriate approach for httpclient 4.3 is.
+        	
+        	// Not specify
             logger.debug("Creating HttpClient instance for thread: " + Thread.currentThread().getName());
-            return new HttpClient(new HttpClientFactory.NonBlockingHttpParams());
+            return new HttpClientFactory().getHttpClient();
         }
     };
     
@@ -53,7 +58,7 @@ public class HttpClientHelper
      * Returns an initialised HttpClient instance for the current thread, which
      *  will have been configured for optimal settings
      */
-    public static HttpClient getHttpClient()
+    public static CloseableHttpClient getHttpClient()
     {
         return httpClient.get();
     }

@@ -398,7 +398,7 @@
         <dependency>
             <groupId>org.apache.solr</groupId>
             <artifactId>solr-solrj</artifactId>
-            <version>1.4.1</version>
+            <version>4.9.1</version>
             <exclusions>
                 <exclusion>
                     <groupId>woodstox</groupId>
@@ -803,6 +803,16 @@
             <artifactId>gunit</artifactId>
             <version>${dependency.antlr.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+        	<groupId>org.apache.httpcomponents</groupId>
+        	<artifactId>httpclient</artifactId>
+        	<version>4.3.1</version>
+        </dependency>
+        <dependency>
+        	<groupId>org.apache.httpcomponents</groupId>
+        	<artifactId>httpcore</artifactId>
+        	<version>4.3</version>
         </dependency>
     </dependencies>
 

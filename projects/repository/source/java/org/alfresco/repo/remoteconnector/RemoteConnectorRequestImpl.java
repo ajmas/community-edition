@@ -19,23 +19,24 @@
 package org.alfresco.repo.remoteconnector;
 
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.alfresco.error.AlfrescoRuntimeException;
 import org.alfresco.service.cmr.remoteconnector.RemoteConnectorRequest;
 import org.alfresco.service.cmr.remoteconnector.RemoteConnectorService;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpMethodBase;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.DeleteMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.InputStreamRequestEntity;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.methods.RequestEntity;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.InputStreamEntity;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.message.BasicHeader;
 
 /**
  * Helper wrapper around a Remote Request, to be performed by the
@@ -50,42 +51,42 @@ public class RemoteConnectorRequestImpl implements RemoteConnectorRequest
     
     private final String url;
     private final String methodName;
-    private final HttpMethodBase method;
-    private final List<Header> headers = new ArrayList<Header>();
-    private RequestEntity requestBody;
+    private final HttpRequestBase method;
+    Map<String,Header> headers = new HashMap<String,Header>();
+    private HttpEntity requestBody;
     
     public RemoteConnectorRequestImpl(String url, String methodName)
     {
         this(url, buildHttpClientMethod(url, methodName));
     }
-    public RemoteConnectorRequestImpl(String url, Class<? extends HttpMethodBase> method)
+    public RemoteConnectorRequestImpl(String url, Class<? extends HttpRequestBase> method)
     {
         this(url, buildHttpClientMethod(url, method));
     }
-    private RemoteConnectorRequestImpl(String url, HttpMethodBase method)
+    private RemoteConnectorRequestImpl(String url, HttpRequestBase method)
     {
         this.url = url;
         this.method = method;
-        this.methodName = method.getName();
+        this.methodName = method.getMethod();
     }
     
-    protected static HttpMethodBase buildHttpClientMethod(String url, String method)
+    protected static HttpRequestBase buildHttpClientMethod(String url, String method)
     {
         if ("GET".equals(method))
         {
-            return new GetMethod(url);
+            return new HttpGet(url);
         }
         if ("POST".equals(method))
         {
-            return new PostMethod(url);
+            return new HttpPost(url);
         }
         if ("PUT".equals(method))
         {
-            return new PutMethod(url);
+            return new HttpPut(url);
         }
         if ("DELETE".equals(method))
         {
-            return new DeleteMethod(url);
+            return new HttpDelete(url);
         }
         if (TestingMethod.METHOD_NAME.equals(method))
         {
@@ -93,9 +94,9 @@ public class RemoteConnectorRequestImpl implements RemoteConnectorRequest
         }
         throw new UnsupportedOperationException("Method '"+method+"' not supported");
     }
-    protected static HttpMethodBase buildHttpClientMethod(String url, Class<? extends HttpMethodBase> method)
+    protected static HttpRequestBase buildHttpClientMethod(String url, Class<? extends HttpRequestBase> method)
     {
-        HttpMethodBase request = null;
+        HttpRequestBase request = null;
         try
         {
             request = method.getConstructor(String.class).newInstance(url);
@@ -115,63 +116,50 @@ public class RemoteConnectorRequestImpl implements RemoteConnectorRequest
     {
         return methodName;
     }
-    public HttpMethodBase getMethodInstance()
+    public HttpRequestBase getMethodInstance()
     {
         return method;
     }
     
     public String getContentType()
     {
-        for (Header hdr : headers)
-        {
-            if (HEADER_CONTENT_TYPE.equals( hdr.getName() ))
-            {
-                return hdr.getValue();
-            }
-        }
-        return null;
+    	Header header = headers.get(HEADER_CONTENT_TYPE);
+    	if (header != null)
+    	{
+    		return header.getValue();
+    	}
+    	return null;
     }
     public void setContentType(String contentType)
     {
-        for (Header hdr : headers)
-        {
-            if (HEADER_CONTENT_TYPE.equals( hdr.getName() ))
-            {
-                hdr.setValue(contentType);
-                return;
-            }
-        }
-        headers.add(new Header(HEADER_CONTENT_TYPE, contentType));
+    	headers.put(HEADER_CONTENT_TYPE, new BasicHeader(HEADER_CONTENT_TYPE, contentType));
     }
     
-    public RequestEntity getRequestBody()
+    public HttpEntity getRequestBody()
     {
         return requestBody;
     }
     public void setRequestBody(String body)
     {
-        try
-        {
-            requestBody = new StringRequestEntity(body, getContentType(), "UTF-8");
-        }
-        catch (UnsupportedEncodingException e) {} // Can't occur
+        requestBody = new StringEntity(body, ContentType.create(getContentType(), "UTF-8"));
+
     }
     public void setRequestBody(byte[] body)
     {
-        requestBody = new ByteArrayRequestEntity(body);
+        requestBody = new ByteArrayEntity(body);
     }
     public void setRequestBody(InputStream body)
     {
-        requestBody = new InputStreamRequestEntity(body);
+        requestBody = new InputStreamEntity(body);
     }
-    public void setRequestBody(RequestEntity body)
+    public void setRequestBody(HttpEntity body)
     {
         requestBody = body;
     }
     
     public Header[] getRequestHeaders()
     {
-        return headers.toArray(new Header[headers.size()]);
+    	return headers.keySet().toArray(new Header[headers.size()]);
     }
     public void addRequestHeader(Header header)
     {
@@ -179,39 +167,20 @@ public class RemoteConnectorRequestImpl implements RemoteConnectorRequest
     }
     public void addRequestHeader(String name, String value)
     {
-        addRequestHeader(new Header(name,value));
+        addRequestHeader(new BasicHeader(name,value));
     }
     public void addRequestHeaders(Header[] headers)
     {
-        for (Header newHdr : headers)
-        {
-            // See if we already have one of these headers
-            Header existingHdr = null;
-            for (Header hdr : this.headers)
-            {
-                if (newHdr.getName().equals( hdr.getName() ))
-                {
-                    existingHdr = hdr;
-                }
-            }
-            
-            // Update or add as needed
-            if (existingHdr != null)
-            {
-                existingHdr.setValue(newHdr.getValue());
-            }
-            else
-            {
-                this.headers.add(newHdr);
-            }
-        }
+    	for (Header newHdr : headers) {
+    		this.headers.put(newHdr.getName(), newHdr);
+    	}
     }
     
     /**
      * An HttpClient Method implementation for the method "TESTING",
      *  which we use in certain unit tests
      */
-    private static class TestingMethod extends GetMethod
+    private static class TestingMethod extends HttpGet
     {
         private static final String METHOD_NAME = "TESTING";
         
@@ -221,9 +190,10 @@ public class RemoteConnectorRequestImpl implements RemoteConnectorRequest
         }
         
         @Override
-        public String getName()
+		public String getMethod()
         {
             return METHOD_NAME;
-        }
+		}
+
     }
 }

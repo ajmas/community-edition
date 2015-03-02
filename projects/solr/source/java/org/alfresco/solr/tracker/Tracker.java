@@ -30,6 +30,7 @@ import org.alfresco.solr.client.Node;
 import org.alfresco.solr.client.NodeMetaData;
 import org.alfresco.solr.client.NodeMetaDataParameters;
 import org.alfresco.solr.client.SOLRAPIClient.GetTextContentResponse;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 
 public interface Tracker
@@ -71,7 +72,7 @@ public interface Tracker
     
 // All trackers (check() = what things that it tracks are ok)
     IndexHealthReport checkIndex(Long fromTx, Long toTx, Long fromAclTx, Long toAclTx, Long fromTime,
-                Long toTime) throws AuthenticationException, IOException, JSONException;
+                Long toTime) throws AuthenticationException, IOException, JSONException, ProtocolException;
 
     // MetadataTracker
     NodeReport checkNode(Node node);
@@ -91,7 +92,7 @@ public interface Tracker
 
     
     // ModelTracker
-    void trackModels(boolean onlyFirstTime) throws AuthenticationException, IOException, JSONException;
+    void trackModels(boolean onlyFirstTime) throws AuthenticationException, IOException, JSONException, ProtocolException;
 
     void ensureFirstModelSync();
 
@@ -100,11 +101,11 @@ public interface Tracker
 
     // MetadataTracker
     List<NodeMetaData> getNodesMetaData(NodeMetaDataParameters params, int maxResults)
-                throws AuthenticationException, IOException, JSONException;
+                throws AuthenticationException, IOException, JSONException, ProtocolException;
 
     // ContentTracker
     GetTextContentResponse getTextContent(Long nodeId, QName propertyQName, Long modifiedSince)
-                throws AuthenticationException, IOException;
+                throws AuthenticationException, IOException, ProtocolException;
 
     boolean canAddContentPropertyToDoc();
 

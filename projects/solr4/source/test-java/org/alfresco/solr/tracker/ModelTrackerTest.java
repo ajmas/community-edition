@@ -38,6 +38,7 @@ import org.alfresco.solr.client.AlfrescoModel;
 import org.alfresco.solr.client.AlfrescoModelDiff;
 import org.alfresco.solr.client.AlfrescoModelDiff.TYPE;
 import org.alfresco.solr.client.SOLRAPIClient;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -106,7 +107,7 @@ public class ModelTrackerTest
     }
 
     @Test
-    public void testDoTrack() throws AuthenticationException, IOException, JSONException
+    public void testDoTrack() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         ModelTracker spiedModelTracker = spy(this.modelTracker);
         spiedModelTracker.doTrack();
@@ -116,7 +117,7 @@ public class ModelTrackerTest
     }
 
     @Test
-    public void testTrackModels() throws AuthenticationException, IOException, JSONException
+    public void testTrackModels() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         final String name = setUpTestTrackModels();
 
@@ -144,7 +145,7 @@ public class ModelTrackerTest
     }
 
     @SuppressWarnings("unchecked")
-    private String setUpTestTrackModels() throws AuthenticationException, IOException, JSONException
+    private String setUpTestTrackModels() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         QName modelName = QName.createQName("qname");
         TYPE type = TYPE.CHANGED;
@@ -173,7 +174,7 @@ public class ModelTrackerTest
     }
 
     @Test
-    public void testEnsureFirstModelSync() throws AuthenticationException, IOException, JSONException
+    public void testEnsureFirstModelSync() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         final String name = setUpTestTrackModels();
 

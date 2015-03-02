@@ -62,6 +62,7 @@ import org.alfresco.util.Pair;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.util.DateUtil;
+import org.apache.http.ProtocolException;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.JsonToken;
@@ -121,7 +122,7 @@ public class SOLRAPIClient
      * @return                              the ACL ChangeSets in order of commit time and ID
      */
     public AclChangeSets getAclChangeSets(Long fromCommitTime, Long minAclChangeSetId, Long toCommitTime, Long maxAclChangeSetId, int maxResults)
-             throws AuthenticationException, IOException, JSONException
+             throws AuthenticationException, ProtocolException, IOException, JSONException
     {
         StringBuilder url = new StringBuilder(GET_ACL_CHANGESETS_URL);
         StringBuilder args = new StringBuilder();
@@ -214,7 +215,7 @@ public class SOLRAPIClient
      * @param maxResults                    the maximum number of results to retrieve
      * @return                              the ACLs (includes ChangeSet ID)
      */
-    public List<Acl> getAcls(List<AclChangeSet> aclChangeSets, Long minAclId, int maxResults) throws AuthenticationException, IOException, JSONException
+    public List<Acl> getAcls(List<AclChangeSet> aclChangeSets, Long minAclId, int maxResults) throws AuthenticationException, ProtocolException, IOException, JSONException
     {
         StringBuilder url = new StringBuilder(GET_ACLS);
         StringBuilder args = new StringBuilder();
@@ -289,7 +290,7 @@ public class SOLRAPIClient
      * @param acls                          the ACLs
      * @return                              the readers for the ACLs
      */
-    public List<AclReaders> getAclReaders(List<Acl> acls) throws AuthenticationException, IOException, JSONException
+    public List<AclReaders> getAclReaders(List<Acl> acls) throws AuthenticationException, ProtocolException, IOException, JSONException
     {
         StringBuilder url = new StringBuilder(GET_ACLS_READERS);
         
@@ -375,7 +376,7 @@ public class SOLRAPIClient
         return authorities;
     }
     
-    public Transactions getTransactions(Long fromCommitTime, Long minTxnId, Long toCommitTime, Long maxTxnId, int maxResults) throws AuthenticationException, IOException, JSONException
+    public Transactions getTransactions(Long fromCommitTime, Long minTxnId, Long toCommitTime, Long maxTxnId, int maxResults) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         StringBuilder url = new StringBuilder(GET_TRANSACTIONS_URL);
         StringBuilder args = new StringBuilder();
@@ -475,7 +476,7 @@ public class SOLRAPIClient
         return new Transactions(transactions, maxTxnCommitTime, maxTxnIdOnServer);
     }
     
-    public List<Node> getNodes(GetNodesParameters parameters, int maxResults) throws AuthenticationException, IOException, JSONException
+    public List<Node> getNodes(GetNodesParameters parameters, int maxResults) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         StringBuilder url = new StringBuilder(GET_NODES_URL);
 
@@ -705,7 +706,7 @@ public class SOLRAPIClient
         return ret;
     }
     
-    public List<NodeMetaData> getNodesMetaData(NodeMetaDataParameters params, int maxResults) throws AuthenticationException, IOException, JSONException
+    public List<NodeMetaData> getNodesMetaData(NodeMetaDataParameters params, int maxResults) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         List<Long> nodeIds = params.getNodeIds();
         
@@ -978,7 +979,7 @@ public class SOLRAPIClient
         return nodes;
     }
     
-    public GetTextContentResponse getTextContent(Long nodeId, QName propertyQName, Long modifiedSince) throws AuthenticationException, IOException
+    public GetTextContentResponse getTextContent(Long nodeId, QName propertyQName, Long modifiedSince) throws AuthenticationException, IOException, ProtocolException
     {
         StringBuilder url = new StringBuilder(128);
         url.append(GET_CONTENT);
@@ -1031,7 +1032,7 @@ public class SOLRAPIClient
         return new GetTextContentResponse(response);
     }
     
-    public AlfrescoModel getModel(QName modelName) throws AuthenticationException, IOException, JSONException
+    public AlfrescoModel getModel(QName modelName) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         // If the model is new to the SOLR side the prefix will be unknown so we can not generate prefixes for the request!
         // Always use the full QName with explicit URI
@@ -1064,7 +1065,7 @@ public class SOLRAPIClient
         }
     }
     
-    public List<AlfrescoModelDiff> getModelsDiff(List<AlfrescoModel> currentModels) throws AuthenticationException, IOException, JSONException
+    public List<AlfrescoModelDiff> getModelsDiff(List<AlfrescoModel> currentModels) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         StringBuilder url = new StringBuilder(GET_MODELS_DIFF);
 

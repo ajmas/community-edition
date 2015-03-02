@@ -92,6 +92,7 @@ import org.alfresco.solr.tracker.TrackerStats;
 import org.alfresco.util.ISO9075;
 import org.alfresco.util.Pair;
 import org.apache.commons.io.input.BoundedInputStream;
+import org.apache.http.ProtocolException;
 import org.apache.lucene.index.IndexCommit;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.util.BytesRef;
@@ -1433,7 +1434,7 @@ public class SolrInformationServer implements InformationServer
 
     private void updateDescendantDocs(NodeMetaData parentNodeMetaData, boolean overwrite,
                 SolrQueryRequest request, UpdateRequestProcessor processor, LinkedHashSet<Long> stack) 
-                            throws AuthenticationException, IOException, JSONException
+                            throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         if (stack.contains(parentNodeMetaData.getId()))
         {
@@ -1457,7 +1458,7 @@ public class SolrInformationServer implements InformationServer
 
     private void doUpdateDescendantDocs(NodeMetaData parentNodeMetaData, boolean overwrite,
                 SolrQueryRequest request, UpdateRequestProcessor processor, LinkedHashSet<Long> stack) 
-                            throws AuthenticationException, IOException, JSONException
+                            throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         if (skipDescendantDocsForSpecificTypes 
                     && typesForSkippingDescendantDocs.contains(parentNodeMetaData.getType()))
@@ -1556,9 +1557,10 @@ public class SolrInformationServer implements InformationServer
 
     /**
      * Checks if a cascade update is necessary, and then updates descendants
+     * @throws ProtocolException 
      */
     private void cascadeUpdate(NodeMetaData nodeMetaData, boolean overwrite, SolrQueryRequest request, 
-                UpdateRequestProcessor processor) throws AuthenticationException, IOException, JSONException
+                UpdateRequestProcessor processor) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         log.info(".. checking for path change");
         String query = FIELD_DBID + ":" + nodeMetaData.getId() + AND + FIELD_PARENT_ASSOC_CRC + ":"
@@ -2255,7 +2257,7 @@ public class SolrInformationServer implements InformationServer
     }
 
     private SolrInputDocument recreateSolrDoc(long dbId, String tenant) throws AuthenticationException, IOException,
-            JSONException
+            JSONException, ProtocolException
     {
         NodeMetaDataParameters nmdp = new NodeMetaDataParameters();
         nmdp.setFromNodeId(dbId);
@@ -2291,7 +2293,7 @@ public class SolrInformationServer implements InformationServer
     }
     
     private void addContentToDoc(SolrInputDocument doc, long dbId) throws UnsupportedEncodingException,
-            AuthenticationException, IOException
+            AuthenticationException, IOException, ProtocolException
     {
         Collection<String> fieldNames = doc.deepCopy().getFieldNames();
         for (String fieldName : fieldNames)
@@ -2309,7 +2311,7 @@ public class SolrInformationServer implements InformationServer
     
     private void addContentPropertyToDocUsingAlfrescoRepository(SolrInputDocument doc,
                 QName propertyQName, long dbId, String locale) 
-                            throws AuthenticationException, IOException, UnsupportedEncodingException
+                            throws AuthenticationException, IOException, UnsupportedEncodingException, ProtocolException
     {
         long start = System.nanoTime();
         

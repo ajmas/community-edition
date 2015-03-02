@@ -48,6 +48,7 @@ import org.alfresco.solr.client.Transaction;
 import org.alfresco.solr.client.Transactions;
 import org.alfresco.util.DynamicallySizedThreadPoolExecutor;
 import org.alfresco.util.TraceableThreadFactory;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.quartz.Scheduler;
 
@@ -163,7 +164,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
     }
 
     @Override
-    protected void trackTransactions() throws AuthenticationException, IOException, JSONException
+    protected void trackTransactions() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         if (!enableMultiThreadedTracking)
         {
@@ -284,7 +285,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
         return count;
     }
 
-    private int indexBatchOfTransactions(List<Transaction> txBatch) throws AuthenticationException, IOException, JSONException
+    private int indexBatchOfTransactions(List<Transaction> txBatch) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         int docCount = 0;
 
@@ -353,7 +354,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
      * @throws JSONException
      */
     @Override
-    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException
+    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         if (!enableMultiThreadedTracking)
         {
@@ -498,7 +499,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
         return count;
     }
 
-    private int indexBatchOfChangeSets(List<AclChangeSet> changeSetBatch) throws AuthenticationException, IOException, JSONException
+    private int indexBatchOfChangeSets(List<AclChangeSet> changeSetBatch) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         int aclCount = 0;
         ArrayList<AclChangeSet> nonEmptyChangeSets = new ArrayList<AclChangeSet>(changeSetBatch.size());
@@ -621,6 +622,11 @@ public class MultiThreadedCoreTracker extends CoreTracker
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
+            catch (ProtocolException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }            
             finally
             {
                 // Triple check that we get the queue state right
@@ -629,7 +635,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
 
         }
 
-        abstract protected void doWork() throws IOException, AuthenticationException, JSONException;
+        abstract protected void doWork() throws IOException, AuthenticationException, JSONException, ProtocolException;
 
         /**
          * Removes this instance from the queue and notifies the HEAD
@@ -676,7 +682,7 @@ public class MultiThreadedCoreTracker extends CoreTracker
             this.acls = acls;
         }
 
-        protected void doWork() throws IOException, AuthenticationException, JSONException
+        protected void doWork() throws IOException, AuthenticationException, JSONException, ProtocolException
         {
             List<AclReaders> readers = client.getAclReaders(acls);
             indexAcl(readers, true);

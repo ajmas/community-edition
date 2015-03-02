@@ -32,19 +32,26 @@ import org.alfresco.service.cmr.remoteconnector.RemoteConnectorResponse;
 import org.alfresco.service.cmr.remoteconnector.RemoteConnectorServerException;
 import org.alfresco.service.cmr.remoteconnector.RemoteConnectorService;
 import org.alfresco.util.HttpClientHelper;
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethodBase;
-import org.apache.commons.httpclient.ProxyHost;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.ByteArrayRequestEntity;
-import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -68,8 +75,8 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
     private static Log logger = LogFactory.getLog(RemoteConnectorServiceImpl.class);
     private static final long MAX_BUFFER_RESPONSE_SIZE = 10*1024*1024;
  
-    private static ProxyHost httpProxyHost;
-    private static ProxyHost httpsProxyHost;
+    private static HttpHost httpProxyHost;
+    private static HttpHost httpsProxyHost;
     private static Credentials httpProxyCredentials;
     private static Credentials httpsProxyCredentials;
     private static AuthScope httpAuthScope;
@@ -107,7 +114,7 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
     /**
      * Builds a new Request object, using HttpClient method descriptions
      */
-    public RemoteConnectorRequest buildRequest(String url, Class<? extends HttpMethodBase> method)
+    public RemoteConnectorRequest buildRequest(String url, Class<? extends HttpRequestBase> method)
     {
         return new RemoteConnectorRequestImpl(url, method);
     }
@@ -119,61 +126,86 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
         RemoteConnectorClientException, RemoteConnectorServerException
     {
         RemoteConnectorRequestImpl reqImpl = (RemoteConnectorRequestImpl)request;
-        HttpMethodBase httpRequest = reqImpl.getMethodInstance();
+        HttpRequestBase httpRequest = reqImpl.getMethodInstance();
         
         // Attach the headers to the request
         for (Header hdr : request.getRequestHeaders())
         {
-            httpRequest.addRequestHeader(hdr);
+            httpRequest.addHeader(hdr);
         }
         
         // Attach the body, if possible
-        if (httpRequest instanceof EntityEnclosingMethod)
+        if (httpRequest instanceof  HttpEntityEnclosingRequestBase)
         {
             if (request.getRequestBody() != null)
             {
-                ((EntityEnclosingMethod)httpRequest).setRequestEntity( reqImpl.getRequestBody() );
+                ((HttpEntityEnclosingRequestBase)httpRequest).setEntity( reqImpl.getRequestBody() );
             }
         }
         
         // Grab our thread local HttpClient instance
-        // Remember - we must then clean it up!
-        HttpClient httpClient = HttpClientHelper.getHttpClient();
-        
+        // Remember - we must then clean it up!        
+        CloseableHttpClient httpClient = HttpClientHelper.getHttpClient();
+    	HttpClientContext localHttpClientContext = HttpClientContext.create();
+
         // The url should already be vetted by the RemoteConnectorRequest
         URL url = new URL(request.getURL());
         
         // Use the appropriate Proxy Host if required
         if (httpProxyHost != null && url.getProtocol().equals("http") && requiresProxy(url.getHost()))
-        {
-            httpClient.getHostConfiguration().setProxyHost(httpProxyHost);
+        {        	
+        	RequestConfig config = RequestConfig.custom()
+                    .setProxy(httpProxyHost)                    
+                    .build();
+        	
+        	httpRequest.setConfig(config);
+
             if (logger.isDebugEnabled())
+            {
                 logger.debug(" - using HTTP proxy host for: " + url);
+            }
             if (httpProxyCredentials != null)
             {
-                httpClient.getState().setProxyCredentials(httpAuthScope, httpProxyCredentials);
+                CredentialsProvider credsProvider = new BasicCredentialsProvider();
+                credsProvider.setCredentials(
+                		httpAuthScope,
+                		httpProxyCredentials);
+                
+                localHttpClientContext.setCredentialsProvider(credsProvider);
+
                 if (logger.isDebugEnabled())
+                {
                     logger.debug(" - using HTTP proxy credentials for proxy: " + httpProxyHost.getHostName());
+                }
             }
         }
         else if (httpsProxyHost != null && url.getProtocol().equals("https") && requiresProxy(url.getHost()))
-        {
-            httpClient.getHostConfiguration().setProxyHost(httpsProxyHost);
+        {            
+        	RequestConfig config = RequestConfig.custom()
+                    .setProxy(httpsProxyHost)
+                    .build();
+        	
+        	httpRequest.setConfig(config);
+        	
+        	
             if (logger.isDebugEnabled())
+            {
                 logger.debug(" - using HTTPS proxy host for: " + url);
+            }
             if (httpsProxyCredentials != null)
             {
-                httpClient.getState().setProxyCredentials(httpsAuthScope, httpsProxyCredentials);
+                CredentialsProvider credsProvider = new BasicCredentialsProvider();
+                credsProvider.setCredentials(
+                		httpsAuthScope,
+                		httpsProxyCredentials);
+                
+                localHttpClientContext.setCredentialsProvider(credsProvider);
                 if (logger.isDebugEnabled())
+                {
                     logger.debug(" - using HTTPS proxy credentials for proxy: " + httpsProxyHost.getHostName());
+                }
             }
         } 
-        else 
-        {
-            //host should not be proxied remove any configured proxies
-            httpClient.getHostConfiguration().setProxyHost(null);
-            httpClient.getState().clearProxyCredentials();
-        }
         
         // Log what we're doing
         if (logger.isDebugEnabled()) {
@@ -187,14 +219,14 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
             {
                 requestBody = request.getRequestBody();
             }
-            if (requestBody != null && requestBody instanceof StringRequestEntity)
+            if (requestBody != null && requestBody instanceof StringEntity)
             {
-                StringRequestEntity re = (StringRequestEntity)request.getRequestBody();
+            	StringEntity re = (StringEntity)request.getRequestBody();
                 logger.debug("Payload (string): " + re.getContent());
             }
-            else if (requestBody != null && requestBody instanceof ByteArrayRequestEntity)
+            else if (requestBody != null && requestBody instanceof ByteArrayEntity)
             {
-                ByteArrayRequestEntity re = (ByteArrayRequestEntity)request.getRequestBody();
+                ByteArrayEntity re = (ByteArrayEntity)request.getRequestBody();
                 logger.debug("Payload (byte array): " + re.getContent().toString());
             }
             else
@@ -205,28 +237,32 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
         
         // Perform the request, and wrap the response
         int status = -1;
+        CloseableHttpResponse httpResponse = null;
         String statusText = null;
         RemoteConnectorResponse response = null;
         try
         {
-            status = httpClient.executeMethod(httpRequest);
-            statusText = httpRequest.getStatusText();
+        	httpResponse = httpClient.execute(httpRequest, localHttpClientContext);
+            statusText = httpResponse.getStatusLine().getReasonPhrase();
+            status = httpResponse.getStatusLine().getStatusCode();
             
-            Header[] responseHdrs = httpRequest.getResponseHeaders();
-            Header responseContentTypeH = httpRequest.getResponseHeader(RemoteConnectorRequestImpl.HEADER_CONTENT_TYPE);
-            String responseCharSet = httpRequest.getResponseCharSet();
+            HttpEntity httpEntity = httpResponse.getEntity();
+
+            Header[] responseHdrs = httpResponse.getAllHeaders();
+            Header responseContentTypeH = httpEntity.getContentType();
+            String responseCharSet = httpEntity.getContentEncoding().getValue();
             String responseContentType = (responseContentTypeH != null ? responseContentTypeH.getValue() : null);
             
             if(logger.isDebugEnabled())
             {
-                logger.debug("response url=" + request.getURL() + ", length =" + httpRequest.getResponseContentLength() + ", responceContentType " + responseContentType + ", statusText =" + statusText );
+                logger.debug("response url=" + request.getURL() + ", length =" + httpEntity.getContentLength() + ", responceContentType " + responseContentType + ", statusText =" + statusText );
             }
             
             // Decide on how best to handle the response, based on the size
             // Ideally, we want to close the HttpClient resources immediately, but
             //  that isn't possible for very large responses
             // If we can close immediately, it makes cleanup simpler and fool-proof
-            if (httpRequest.getResponseContentLength() > MAX_BUFFER_RESPONSE_SIZE || httpRequest.getResponseContentLength() == -1 )
+            if (httpEntity.getContentLength() > MAX_BUFFER_RESPONSE_SIZE || httpEntity.getContentLength() == -1 )
             {
                 if(logger.isTraceEnabled())
                 {
@@ -234,7 +270,7 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
                 }
                 
                 // Need to wrap the InputStream in something that'll close
-                InputStream wrappedStream = new HttpClientReleasingInputStream(httpRequest);
+                InputStream wrappedStream = new HttpClientReleasingInputStream(httpRequest, httpResponse);
                 httpRequest = null;
                 
                 // Now build the response
@@ -249,9 +285,10 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
                 }
                 // Fairly small response, just keep the bytes and make life simple
                 response = new RemoteConnectorResponseImpl(request, responseContentType, responseCharSet,
-                                                           status, responseHdrs, httpRequest.getResponseBody());
+                                                           status, responseHdrs, httpEntity.getContent());
                 
                 // Now we have the bytes, we can close the HttpClient resources
+                EntityUtils.consumeQuietly(httpEntity);
                 httpRequest.releaseConnection();
                 httpRequest = null;
             }
@@ -260,7 +297,7 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
         {
             // Make sure, problems or not, we always tidy up (if not large stream based)
             // This is important because we use a thread local HttpClient instance
-            if (httpRequest != null)
+            if (httpClient != null)
             {
                 httpRequest.releaseConnection();
                 httpRequest = null;
@@ -270,15 +307,13 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
         
         // Log the response
         if (logger.isDebugEnabled())
+        {
             logger.debug("Response was " + status + " " + statusText);
+        }
         
         // Decide if we should throw an exception
         if (status >= 300)
         {
-            // Tidy if needed
-            if (httpRequest != null)
-                httpRequest.releaseConnection();
-            
             // Specific exceptions
             if (status == Status.STATUS_FORBIDDEN ||
                 status == Status.STATUS_UNAUTHORIZED)
@@ -301,19 +336,9 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
             }
             else
             {
-                // Client request exceptions
-                if (httpRequest != null)
-                {
-                    // Response wasn't too big and is available, supply it
-                    logger.error("executeRequest: remote connector client exception: ["+status+"] "+statusText);
-                    throw new RemoteConnectorClientException(status, statusText, response);
-                }
-                else
-                {
-                    // Response was too large, report without it
-                    logger.error("executeRequest: remote connector client exception: ["+status+"] "+statusText);
-                    throw new RemoteConnectorClientException(status, statusText, null);
-                }
+                // Response was too large, report without it
+                logger.error("executeRequest: remote connector client exception: ["+status+"] "+statusText);
+                throw new RemoteConnectorClientException(status, statusText, null);           
             }
         }
         
@@ -359,18 +384,23 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
     
     private static class HttpClientReleasingInputStream extends FilterInputStream
     {
-        private HttpMethodBase httpRequest;
-        private HttpClientReleasingInputStream(HttpMethodBase httpRequest) throws IOException
+        private HttpRequestBase httpRequest;
+        private CloseableHttpResponse httpResponse;
+        
+        private HttpClientReleasingInputStream(HttpRequestBase httpRequest, CloseableHttpResponse httpResponse) throws IOException
         {
-            super(httpRequest.getResponseBodyAsStream());
+            super(httpResponse.getEntity().getContent());
             this.httpRequest = httpRequest;
+            this.httpResponse = httpResponse;
         }
 
         @Override
         public void close() throws IOException
         {
+        	EntityUtils.consumeQuietly(httpResponse.getEntity());
             // Tidy the main stream
-            super.close();
+        	httpResponse.close();
+        	
             
             // Now release the underlying resources
             if (httpRequest != null)
@@ -411,20 +441,20 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
      * 
      * @return ProxyHost if appropriate properties have been set, null otherwise
      */
-    private static ProxyHost createProxyHost(final String hostProperty, final String portProperty, final int defaultPort)
+    private static HttpHost createProxyHost(final String hostProperty, final String portProperty, final int defaultPort)
     {
         final String proxyHost = System.getProperty(hostProperty);
-        ProxyHost proxy = null;
+        HttpHost proxy = null;
         if (proxyHost != null && proxyHost.length() != 0)
         {
             final String strProxyPort = System.getProperty(portProperty);
             if (strProxyPort == null || strProxyPort.length() == 0)
             {
-                proxy = new ProxyHost(proxyHost, defaultPort);
+                proxy = new HttpHost(proxyHost, defaultPort);
             }
             else
             {
-                proxy = new ProxyHost(proxyHost, Integer.parseInt(strProxyPort));
+                proxy = new HttpHost(proxyHost, Integer.parseInt(strProxyPort));
             }
             if (logger.isDebugEnabled())
                 logger.debug("ProxyHost: " + proxy.toString());
@@ -457,7 +487,7 @@ public class RemoteConnectorServiceImpl implements RemoteConnectorService
      * @param proxyHost
      * @return Authscope for provided ProxyHost, null otherwise.
      */
-    private static AuthScope createProxyAuthScope(final ProxyHost proxyHost)
+    private static AuthScope createProxyAuthScope(final HttpHost proxyHost)
     {
         AuthScope authScope = null;
         if (proxyHost !=  null) 

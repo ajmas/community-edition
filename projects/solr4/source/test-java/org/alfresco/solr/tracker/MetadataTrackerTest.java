@@ -37,6 +37,7 @@ import org.alfresco.solr.client.Node;
 import org.alfresco.solr.client.SOLRAPIClient;
 import org.alfresco.solr.client.Transaction;
 import org.alfresco.solr.client.Transactions;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.junit.Before;
 import org.junit.Test;
@@ -80,7 +81,7 @@ public class MetadataTrackerTest
     }
 
     @Test
-    public void doTrackWithOneTransactionUpdatesOnce() throws AuthenticationException, IOException, JSONException
+    public void doTrackWithOneTransactionUpdatesOnce() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         TrackerState state = new TrackerState();
         state.setTimeToStopIndexing(2L);
@@ -115,7 +116,7 @@ public class MetadataTrackerTest
     }
 
     @Test
-    public void doTrackWithNoTransactionsDoesNothing() throws AuthenticationException, IOException, JSONException
+    public void doTrackWithNoTransactionsDoesNothing() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         TrackerState state = new TrackerState();
         when(srv.getTrackerInitialState()).thenReturn(state);
@@ -133,7 +134,7 @@ public class MetadataTrackerTest
     }
 
     @Test
-    public void testCheckNodeLong() throws AuthenticationException, IOException, JSONException
+    public void testCheckNodeLong() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         List<Node> nodes = getNodes();
         when(repositoryClient.getNodes(any(GetNodesParameters.class), eq(1))).thenReturn(nodes);
@@ -174,7 +175,7 @@ public class MetadataTrackerTest
     }
     
     @Test
-    public void testGetFullNodesForDbTransaction() throws AuthenticationException, IOException, JSONException
+    public void testGetFullNodesForDbTransaction() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         List<Node> nodes = getNodes();
         when(repositoryClient.getNodes(any(GetNodesParameters.class), anyInt())).thenReturn(nodes);

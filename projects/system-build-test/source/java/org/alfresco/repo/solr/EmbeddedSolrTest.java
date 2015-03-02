@@ -40,15 +40,16 @@ import org.alfresco.httpclient.HttpClientFactory;
 import org.alfresco.httpclient.HttpClientFactory.SecureCommsType;
 import org.alfresco.repo.search.impl.lucene.LuceneQueryParserException;
 import org.apache.commons.codec.net.URLCodec;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -80,11 +81,14 @@ public class EmbeddedSolrTest  extends TestCase
         sb.append("/solr/admin/cores");
         this.baseUrl = sb.toString();
 
-        httpClient = httpClientFactory.getHttpClient();
-        HttpClientParams params = httpClient.getParams();
-        params.setBooleanParameter(HttpClientParams.PREEMPTIVE_AUTHENTICATION, true);
-        httpClient.getState().setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), new UsernamePasswordCredentials("admin", "admin"));
-    }
+    	HttpClientBuilder httpClientBuilder = httpClientFactory.getHttpClientBuilder();
+    	
+		// TODO remove credentials because we're using SSL?
+    	CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+    	credentialsProvider.setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), 
+    			new UsernamePasswordCredentials("admin", "admin"));
+    	httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);               
+     }
     
     
     public void testEmbeddedAFTS() throws JSONException
@@ -187,29 +191,19 @@ public class EmbeddedSolrTest  extends TestCase
                 
             }
           
-            PostMethod post = new PostMethod(url.toString());
-            
+            HttpPost post = new HttpPost(url.toString());
+            HttpEntity entity = null;
             try
             {
-                httpClient.executeMethod(post);
+                HttpResponse response = httpClient.execute(post);
 
-                if(post.getStatusCode() == HttpStatus.SC_MOVED_PERMANENTLY || post.getStatusCode() == HttpStatus.SC_MOVED_TEMPORARILY)
+                if (response.getStatusLine().getStatusCode() != HttpServletResponse.SC_OK)
                 {
-                    Header locationHeader = post.getResponseHeader("location");
-                    if (locationHeader != null)
-                    {
-                        String redirectLocation = locationHeader.getValue();
-                        post.setURI(new URI(redirectLocation, true));
-                        httpClient.executeMethod(post);
-                    }
+                    throw new LuceneQueryParserException("Request failed " + response.getStatusLine().getStatusCode() + " " + url.toString());
                 }
 
-                if (post.getStatusCode() != HttpServletResponse.SC_OK)
-                {
-                    throw new LuceneQueryParserException("Request failed " + post.getStatusCode() + " " + url.toString());
-                }
-
-                Reader reader = new BufferedReader(new InputStreamReader(post.getResponseBodyAsStream()));
+                entity = response.getEntity();
+                Reader reader = new BufferedReader(new InputStreamReader(entity.getContent()));
                 // TODO - replace with streaming-based solution e.g. SimpleJSON ContentHandler
                 JSONObject json = new JSONObject(new JSONTokener(reader));
                 return json;
@@ -217,13 +211,10 @@ public class EmbeddedSolrTest  extends TestCase
             finally
             {
                 post.releaseConnection();
+                EntityUtils.consumeQuietly(entity);
             }
         }
         catch (UnsupportedEncodingException e)
-        {
-            throw new LuceneQueryParserException("", e);
-        }
-        catch (HttpException e)
         {
             throw new LuceneQueryParserException("", e);
         }

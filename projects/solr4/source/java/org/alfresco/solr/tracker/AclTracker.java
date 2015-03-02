@@ -42,6 +42,7 @@ import org.alfresco.solr.client.AclReaders;
 import org.alfresco.solr.client.GetNodesParameters;
 import org.alfresco.solr.client.Node;
 import org.alfresco.solr.client.SOLRAPIClient;
+import org.apache.http.ProtocolException;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +105,7 @@ public class AclTracker extends AbstractTracker
         trackRepository();
     }
     
-    protected void indexAclChangeSets() throws AuthenticationException, IOException, JSONException
+    protected void indexAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclChangeSetsToIndex.peek() != null)
@@ -135,7 +136,7 @@ public class AclTracker extends AbstractTracker
         }
     }
     
-    protected void indexAcls() throws AuthenticationException, IOException, JSONException
+    protected void indexAcls() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclsToIndex.peek() != null)
@@ -157,7 +158,7 @@ public class AclTracker extends AbstractTracker
         }
     }
 
-    protected void reindexAclChangeSets() throws AuthenticationException, IOException, JSONException
+    protected void reindexAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclChangeSetsToReindex.peek() != null)
@@ -191,7 +192,7 @@ public class AclTracker extends AbstractTracker
         }
     }
 
-    protected void reindexAcls() throws AuthenticationException, IOException, JSONException
+    protected void reindexAcls() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         boolean requiresCommit = false;
         while (aclsToReindex.peek() != null)
@@ -290,7 +291,7 @@ public class AclTracker extends AbstractTracker
         aclsToPurge.offer(aclToPurge);
     }
 
-    protected void trackRepository() throws IOException, AuthenticationException, JSONException
+    protected void trackRepository() throws IOException, AuthenticationException, JSONException, ProtocolException
     {
         // Is the InformationServer ready to update
         int registeredSearcherCount = this.infoSrv.getRegisteredSearcherCount();
@@ -322,8 +323,9 @@ public class AclTracker extends AbstractTracker
      * @throws AuthenticationException
      * @throws IOException
      * @throws JSONException
+     * @throws ProtocolException 
      */
-    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException
+    private void checkRepoAndIndexConsistency(TrackerState state) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         AclChangeSets firstChangeSets = null;
         if (state.getLastGoodChangeSetCommitTimeInIndex() == 0)
@@ -423,7 +425,7 @@ public class AclTracker extends AbstractTracker
         }
     }
 
-    protected AclChangeSets getSomeAclChangeSets(BoundedDeque<AclChangeSet> changeSetsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException
+    protected AclChangeSets getSomeAclChangeSets(BoundedDeque<AclChangeSet> changeSetsFound, Long fromCommitTime, long timeStep, int maxResults, long endTime) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long actualTimeStep  = timeStep;
 
@@ -483,7 +485,7 @@ public class AclTracker extends AbstractTracker
     }
 
     public IndexHealthReport checkIndex(Long toTx, Long toAclTx, Long fromTime, Long toTime) 
-                throws AuthenticationException, IOException, JSONException
+                throws AuthenticationException, IOException, JSONException, ProtocolException
     {   
         // DB ACL TX Count
         long firstChangeSetCommitTimex = 0;
@@ -573,6 +575,10 @@ public class AclTracker extends AbstractTracker
         {
             throw new AlfrescoRuntimeException("Failed to get nodes", e);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get nodes", e);
+        }        
     }
 
 
@@ -606,6 +612,10 @@ public class AclTracker extends AbstractTracker
         {
             throw new AlfrescoRuntimeException("Failed to get acls", e);
         }
+        catch (ProtocolException e)
+        {
+            throw new AlfrescoRuntimeException("Failed to get acls", e);
+        }        
     }
 
     public AclReport checkAcl(Long aclid)
@@ -620,7 +630,7 @@ public class AclTracker extends AbstractTracker
             List<AclReaders> readers = client.getAclReaders(Collections.singletonList(new Acl(0, aclid)));
             aclReport.setExistsInDb(readers.size() == 1);
         }
-        catch (IOException | JSONException | AuthenticationException e)
+        catch (IOException | JSONException | AuthenticationException | ProtocolException e)
         {
             aclReport.setExistsInDb(false);
         }
@@ -634,8 +644,9 @@ public class AclTracker extends AbstractTracker
      * @throws AuthenticationException
      * @throws IOException
      * @throws JSONException
+     * @throws ProtocolException 
      */
-    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException
+    protected void trackAclChangeSets() throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         long startElapsed = System.nanoTime();
         
@@ -787,7 +798,7 @@ public class AclTracker extends AbstractTracker
         return count;
     }
 
-    private int indexBatchOfChangeSets(List<AclChangeSet> changeSetBatch) throws AuthenticationException, IOException, JSONException
+    private int indexBatchOfChangeSets(List<AclChangeSet> changeSetBatch) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         int aclCount = 0;
         ArrayList<AclChangeSet> nonEmptyChangeSets = new ArrayList<AclChangeSet>(changeSetBatch.size());
@@ -837,7 +848,7 @@ public class AclTracker extends AbstractTracker
         }
 
         @Override
-        protected void doWork() throws IOException, AuthenticationException, JSONException
+        protected void doWork() throws IOException, AuthenticationException, JSONException, ProtocolException
         {
             List<AclReaders> readers = client.getAclReaders(acls);
             indexAcl(readers, true);

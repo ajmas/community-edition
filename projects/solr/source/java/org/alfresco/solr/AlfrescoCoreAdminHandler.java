@@ -84,6 +84,7 @@ import org.alfresco.util.ISO8601DateFormat;
 import org.alfresco.util.ISO9075;
 import org.alfresco.util.Pair;
 import org.alfresco.util.SearchLanguageConversion;
+import org.apache.http.ProtocolException;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.search.Query;
@@ -7363,7 +7364,7 @@ public class AlfrescoCoreAdminHandler extends CoreAdminHandler
         report.add(cname, coreSummary);
     }
 
-    private NamedList<Object> buildAclTxReport(Tracker tracker, Long acltxid) throws AuthenticationException, IOException, JSONException
+    private NamedList<Object> buildAclTxReport(Tracker tracker, Long acltxid) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         NamedList<Object> nr = new SimpleOrderedMap<Object>();
         nr.add("TXID", acltxid);
@@ -7395,7 +7396,7 @@ public class AlfrescoCoreAdminHandler extends CoreAdminHandler
         return nr;
     }
 
-    private NamedList<Object> buildTxReport(Tracker tracker, Long txid) throws AuthenticationException, IOException, JSONException
+    private NamedList<Object> buildTxReport(Tracker tracker, Long txid) throws AuthenticationException, IOException, JSONException, ProtocolException
     {
         NamedList<Object> nr = new SimpleOrderedMap<Object>();
         nr.add("TXID", txid);
@@ -7456,7 +7457,7 @@ public class AlfrescoCoreAdminHandler extends CoreAdminHandler
     }
 
     private NamedList<Object> buildTrackerReport(Tracker tracker, Long fromTx, Long toTx, Long fromAclTx, Long toAclTx, Long fromTime, Long toTime) throws IOException,
-            JSONException, AuthenticationException
+            JSONException, AuthenticationException, ProtocolException
     {
         IndexHealthReport indexHealthReport = tracker.checkIndex(fromTx, toTx, fromAclTx, toAclTx, fromTime, toTime);
 
